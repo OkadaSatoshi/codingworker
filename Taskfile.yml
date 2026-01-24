@@ -1,0 +1,194 @@
+version: '3'
+
+vars:
+  PYTHON_VERSION:
+    sh: cat .python-version
+  OLLAMA_MODEL: qwen2.5-coder:7b
+  AIDER_MODEL: ollama_chat/qwen2.5-coder:7b
+
+tasks:
+  # =============================================================================
+  # Setup
+  # =============================================================================
+  setup:
+    desc: 全環境セットアップ
+    cmds:
+      - task: setup:ollama
+      - task: setup:aider
+      - task: setup:go
+      - task: setup:path
+      - echo ""
+      - echo "=== Setup Complete ==="
+
+  setup:ollama:
+    desc: Ollamaとモデルのセットアップ
+    cmds:
+      - |
+        if command -v ollama &> /dev/null; then
+          echo "[SKIP] Ollama already installed: $(ollama --version)"
+        else
+          echo "[INFO] Installing Ollama..."
+          brew install ollama
+          echo "[OK] Ollama installed"
+        fi
+      - |
+        if ! brew services list | grep ollama | grep started &> /dev/null; then
+          echo "[INFO] Starting Ollama service..."
+          brew services start ollama
+          sleep 3
+          echo "[OK] Ollama service started"
+        else
+          echo "[SKIP] Ollama service already running"
+        fi
+      - |
+        if ollama list 2>/dev/null | grep -q "{{.OLLAMA_MODEL}}"; then
+          echo "[SKIP] Model {{.OLLAMA_MODEL}} already downloaded"
+        else
+          echo "[INFO] Downloading model {{.OLLAMA_MODEL}}..."
+          ollama pull {{.OLLAMA_MODEL}}
+          echo "[OK] Model downloaded"
+        fi
+
+  setup:uv:
+    desc: uvのセットアップ
+    cmds:
+      - |
+        if command -v uv &> /dev/null; then
+          echo "[SKIP] uv already installed: $(uv --version)"
+        else
+          echo "[INFO] Installing uv..."
+          brew install uv
+          echo "[OK] uv installed"
+        fi
+
+  setup:aider:
+    desc: Aiderのセットアップ
+    deps: [setup:uv]
+    cmds:
+      - |
+        if [ -f ~/.local/bin/aider ]; then
+          echo "[SKIP] Aider already installed: $(~/.local/bin/aider --version)"
+        else
+          echo "[INFO] Installing Aider with Python {{.PYTHON_VERSION}}..."
+          uv tool install --python python{{.PYTHON_VERSION}} aider-chat
+          echo "[OK] Aider installed"
+        fi
+
+  setup:go:
+    desc: Go (mise) のセットアップ
+    cmds:
+      - |
+        if command -v mise &> /dev/null; then
+          echo "[INFO] Installing tools via mise..."
+          mise install
+          echo "[OK] mise install complete"
+        else
+          echo "[WARN] mise not installed. Please install mise first:"
+          echo "  curl https://mise.run | sh"
+        fi
+
+  setup:path:
+    desc: PATHを.zshrcに追加
+    cmds:
+      - |
+        if grep -q '.local/bin' ~/.zshrc 2>/dev/null; then
+          echo "[SKIP] PATH already configured in .zshrc"
+        else
+          echo "[INFO] Adding PATH to .zshrc..."
+          echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
+          echo "[OK] PATH added. Run 'source ~/.zshrc' to apply"
+        fi
+
+  # =============================================================================
+  # PoC
+  # =============================================================================
+  poc:
+    desc: PoCテスト手順を表示
+    cmds:
+      - |
+        echo "=== PoC Test Cases ==="
+        echo ""
+        echo "1. FizzBuzz - task poc:fizzbuzz"
+        echo "2. CSV      - task poc:csv"
+        echo "3. Bug Fix  - task poc:bugfix"
+        echo ""
+        echo "Run each task for instructions."
+
+  poc:fizzbuzz:
+    desc: テストケース1 - FizzBuzz
+    dir: poc/test-case-1-fizzbuzz
+    cmds:
+      - |
+        echo "=== Test Case 1 - FizzBuzz ==="
+        echo ""
+        echo "Run Aider:"
+        echo "  ~/.local/bin/aider --model {{.AIDER_MODEL}}"
+        echo ""
+        echo "Prompt:"
+        echo "  Create a Go program main.go that prints FizzBuzz from 1 to 100"
+        echo ""
+        echo "Verify:"
+        echo "  mise exec -- go run main.go"
+
+  poc:csv:
+    desc: テストケース2 - CSV処理
+    dir: poc/test-case-2-csv
+    cmds:
+      - |
+        echo "=== Test Case 2 - CSV Processing ==="
+        echo ""
+        echo "Run Aider:"
+        echo "  ~/.local/bin/aider --model {{.AIDER_MODEL}} --file main.go"
+        echo ""
+        echo "Prompt:"
+        echo "  Write a Go program that reads sample.csv, sorts by name, and prints to stdout"
+        echo ""
+        echo "Verify:"
+        echo "  mise exec -- go run main.go"
+
+  poc:bugfix:
+    desc: テストケース3 - バグ修正
+    dir: poc/test-case-3-bugfix
+    cmds:
+      - |
+        echo "=== Test Case 3 - Bug Fix ==="
+        echo ""
+        echo "Run Aider:"
+        echo "  ~/.local/bin/aider --model {{.AIDER_MODEL}} --file buggy.go --file buggy_test.go"
+        echo ""
+        echo "Prompt:"
+        echo "  Fix the bug in buggy.go. The tests should pass after fixing."
+        echo ""
+        echo "Verify:"
+        echo "  mise exec -- go test -v"
+
+  # =============================================================================
+  # Cleanup
+  # =============================================================================
+  cleanup:
+    desc: 環境を削除（検証後のクリーンアップ）
+    cmds:
+      - |
+        echo "=== Cleanup ==="
+        echo ""
+        echo "This will remove Ollama, Aider, and related data."
+      - |
+        echo "[INFO] Removing model {{.OLLAMA_MODEL}}..."
+        ollama rm {{.OLLAMA_MODEL}} || true
+      - |
+        echo "[INFO] Stopping Ollama service..."
+        brew services stop ollama || true
+      - |
+        echo "[INFO] Uninstalling Ollama..."
+        brew uninstall ollama || true
+      - |
+        echo "[INFO] Removing Ollama data..."
+        rm -rf ~/.ollama
+      - |
+        echo "[INFO] Uninstalling Aider..."
+        uv tool uninstall aider-chat || true
+      - |
+        echo "[INFO] Removing Aider cache..."
+        rm -rf ~/.aider
+      - echo ""
+      - echo "[OK] Cleanup complete"
