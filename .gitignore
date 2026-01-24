@@ -1,2 +1,8 @@
 .aider*
 !.aider.model.metadata.json
+
+# Sensitive files
+.env
+.env.*
+*.pem
+*.key
