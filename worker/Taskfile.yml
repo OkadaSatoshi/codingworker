@@ -1,0 +1,113 @@
+version: '3'
+
+vars:
+  BINARY_NAME: codingworker
+  BUILD_DIR: ./bin
+
+tasks:
+  # =============================================================================
+  # Build
+  # =============================================================================
+  build:
+    desc: バイナリをビルド
+    cmds:
+      - mkdir -p {{.BUILD_DIR}}
+      - mise exec -- go build -o {{.BUILD_DIR}}/{{.BINARY_NAME}} ./cmd/worker
+    sources:
+      - ./**/*.go
+    generates:
+      - "{{.BUILD_DIR}}/{{.BINARY_NAME}}"
+
+  # =============================================================================
+  # Run
+  # =============================================================================
+  run:
+    desc: Workerを実行
+    deps: [build]
+    cmds:
+      - "{{.BUILD_DIR}}/{{.BINARY_NAME}}"
+
+  run:dev:
+    desc: 開発モードで実行（ビルドなし）
+    cmds:
+      - mise exec -- go run ./cmd/worker
+
+  # =============================================================================
+  # Test
+  # =============================================================================
+  test:
+    desc: テストを実行
+    cmds:
+      - mise exec -- go test -v ./...
+
+  test:coverage:
+    desc: カバレッジ付きでテストを実行
+    cmds:
+      - mise exec -- go test -v -coverprofile=coverage.out ./...
+      - mise exec -- go tool cover -html=coverage.out -o coverage.html
+      - echo "Coverage report generated at coverage.html"
+
+  # =============================================================================
+  # Dependencies
+  # =============================================================================
+  deps:
+    desc: 依存関係をダウンロード
+    cmds:
+      - mise exec -- go mod download
+      - mise exec -- go mod tidy
+
+  # =============================================================================
+  # Clean
+  # =============================================================================
+  clean:
+    desc: ビルド成果物を削除
+    cmds:
+      - rm -rf {{.BUILD_DIR}}
+      - rm -f coverage.out coverage.html
+
+  # =============================================================================
+  # Lint
+  # =============================================================================
+  lint:
+    desc: コードをリント
+    cmds:
+      - |
+        if command -v golangci-lint &> /dev/null; then
+          golangci-lint run
+        else
+          echo "[WARN] golangci-lint not installed. Run: brew install golangci-lint"
+        fi
+
+  # =============================================================================
+  # Verify
+  # =============================================================================
+  verify:
+    desc: 依存ツールの確認
+    cmds:
+      - |
+        echo "=== Checking dependencies ==="
+      - |
+        echo -n "Go: "
+        mise exec -- go version
+      - |
+        echo -n "Aider: "
+        if [ -f ~/.local/bin/aider ]; then
+          ~/.local/bin/aider --version
+        else
+          echo "NOT FOUND"
+        fi
+      - |
+        echo -n "Ollama: "
+        if command -v ollama &> /dev/null; then
+          ollama --version
+        else
+          echo "NOT FOUND"
+        fi
+      - |
+        echo -n "gh CLI: "
+        if command -v gh &> /dev/null; then
+          gh --version | head -1
+        else
+          echo "NOT FOUND"
+        fi
+      - echo "=== Done ==="

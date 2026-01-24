@@ -1,0 +1,19 @@
+sqs:
+  queue_url: ""  # Set when AWS is configured
+  region: "ap-northeast-1"
+  wait_time_seconds: 20
+  visibility_timeout: 3600
+  use_mock: true  # Set to false when using real AWS SQS
+
+aider:
+  model: "ollama_chat/qwen2.5-coder:7b"
+  bin_path: "${HOME}/.local/bin/aider"
+  timeout_seconds: 3600
+
+github:
+  token: "${GITHUB_TOKEN}"
+  clone_base_dir: "/tmp/codingworker"
+
+worker:
+  max_retries: 3
+  worker_id: "mbp-m4-001"

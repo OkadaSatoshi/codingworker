@@ -6,3 +6,10 @@
 .env.*
 *.pem
 *.key
+
+# Go build artifacts
+worker/bin/
+worker/worker
+*.exe
+coverage.out
+coverage.html

@@ -20,6 +20,41 @@ Goal: GitHub Issues → GitHub Actions → AWS SQS → Go Worker → Aider + Oll
 - `docs/` - Project documentation (English filenames)
 - `poc/` - Proof of concept test cases
 - `scripts/` - Automation scripts
+- `worker/` - Go Worker (SQS polling, Aider execution, GitHub PR creation)
+
+## Worker Component
+
+### Directory Structure
+```
+worker/
+├── cmd/worker/main.go      # Entry point
+├── internal/
+│   ├── config/config.go    # Configuration loader
+│   ├── sqs/client.go       # SQS client (Mock supported)
+│   ├── aider/runner.go     # Aider CLI executor
+│   └── github/client.go    # GitHub operations
+├── configs/config.yaml     # Configuration file
+├── go.mod
+└── Taskfile.yml
+```
+
+### Building Worker
+```bash
+cd worker
+mise exec -- go mod tidy
+mise exec -- go build ./cmd/worker
+```
+
+### Worker Configuration
+`worker/configs/config.yaml`:
+- `sqs.use_mock: true` - Development mode (no AWS required)
+- `github.token` - Uses `$GITHUB_TOKEN` environment variable
+- `aider.bin_path` - Path to Aider binary
+
+### Current Status
+- SQS: Mock implementation (AWS integration pending Phase 1)
+- Aider: CLI execution implemented
+- GitHub: Clone/Branch/PR via git and gh CLI
 
 ## Key Configuration Files
 
