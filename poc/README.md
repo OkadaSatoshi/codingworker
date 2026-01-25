@@ -2,7 +2,7 @@
 
 ## 概要
 
-Aider + Ollama (qwen2.5-coder:7b) の実用性を検証するためのテストケース。
+Aider + Ollama (qwen2.5-coder:1.5b) の実用性を検証するためのテストケース。
 
 ## テストケース
 
@@ -17,7 +17,7 @@ Aider + Ollama (qwen2.5-coder:7b) の実用性を検証するためのテスト�
 ### 前提条件
 
 - Ollama インストール済み
-- qwen2.5-coder:7b ダウンロード済み
+- qwen2.5-coder:1.5b ダウンロード済み
 - Aider インストール済み
 
 ### テストケース1: FizzBuzz
@@ -25,7 +25,7 @@ Aider + Ollama (qwen2.5-coder:7b) の実用性を検証するためのテスト�
 ```bash
 cd test-case-1-fizzbuzz
 git init
-aider --model ollama_chat/qwen2.5-coder:7b
+aider --model ollama_chat/qwen2.5-coder:1.5b
 
 # Aider内で以下を入力:
 # Create a Go program that prints FizzBuzz from 1 to 100
@@ -40,7 +40,7 @@ aider --model ollama_chat/qwen2.5-coder:7b
 ```bash
 cd test-case-2-csv
 git init
-aider --model ollama_chat/qwen2.5-coder:7b
+aider --model ollama_chat/qwen2.5-coder:1.5b
 
 # Aider内で以下を入力:
 # Create a Go program that reads sample.csv and sorts it by the first column, then outputs to stdout
@@ -55,7 +55,7 @@ aider --model ollama_chat/qwen2.5-coder:7b
 ```bash
 cd test-case-3-bugfix
 git init
-aider --model ollama_chat/qwen2.5-coder:7b buggy.go
+aider --model ollama_chat/qwen2.5-coder:1.5b buggy.go
 
 # Aider内で以下を入力:
 # Fix the bug in buggy.go

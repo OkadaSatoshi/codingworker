@@ -10,7 +10,7 @@ Goal: GitHub Issues → GitHub Actions → AWS SQS → Go Worker → Aider + Oll
 ### Tool Selection
 - **Aider** (not OpenHands): Chosen for lighter weight, no Docker required, CLI-based
 - **Ollama**: Local LLM runtime
-- **Model**: `qwen2.5-coder:7b` (for MBP 2018 compatibility)
+- **Model**: `qwen2.5-coder:1.5b` (for MBP 2018 compatibility, CPU inference optimized)
 - **uv**: Python package manager (not pip) for isolated Aider installation
 - **mise**: Tool version manager for Go
 - **Taskfile**: Task automation (not Makefile)
@@ -62,7 +62,7 @@ mise exec -- go build ./cmd/worker
 `.aider.model.metadata.json` - Required to suppress "Unknown context window size" warning:
 ```json
 {
-    "ollama_chat/qwen2.5-coder:7b": {
+    "ollama_chat/qwen2.5-coder:1.5b": {
         "max_tokens": 32768,
         "max_input_tokens": 32768,
         "max_output_tokens": 8192,
@@ -110,7 +110,7 @@ Run with: `task poc:fizzbuzz`, `task poc:csv`, `task poc:bugfix`
 
 ### Running Aider
 ```bash
-~/.local/bin/aider --model ollama_chat/qwen2.5-coder:7b
+~/.local/bin/aider --model ollama_chat/qwen2.5-coder:1.5b
 ```
 
 ### Running Go with mise

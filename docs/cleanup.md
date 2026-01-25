@@ -9,7 +9,7 @@
 brew services stop ollama
 
 # ダウンロードしたモデルの削除
-ollama rm qwen2.5-coder:7b
+ollama rm qwen2.5-coder:1.5b
 
 # Ollamaアンインストール
 brew uninstall ollama

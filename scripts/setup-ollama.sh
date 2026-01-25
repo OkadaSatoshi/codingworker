@@ -5,7 +5,7 @@ set -euo pipefail
 # Ollama Setup Script
 # =============================================================================
 
-MODEL="qwen2.5-coder:7b"
+MODEL="qwen2.5-coder:1.5b"
 
 echo "=== Ollama Setup ==="
 

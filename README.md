@@ -23,7 +23,7 @@ GitHub Issues → GitHub Actions → AWS SQS → Go Worker → Aider + Ollama �
 | コンポーネント | 技術 |
 |:---|:---|
 | コーディングエージェント | Aider |
-| ローカルLLM | Ollama (qwen2.5-coder:7b) |
+| ローカルLLM | Ollama (qwen2.5-coder:1.5b) |
 | メッセージキュー | AWS SQS |
 | ワーカー | Go |
 | IaC | Terraform |

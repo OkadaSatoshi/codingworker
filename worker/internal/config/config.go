@@ -59,7 +59,7 @@ func Load(path string) (*Config, error) {
 		cfg.SQS.VisibilityTimeout = 3600
 	}
 	if cfg.Aider.Model == "" {
-		cfg.Aider.Model = "ollama_chat/qwen2.5-coder:7b"
+		cfg.Aider.Model = "ollama_chat/qwen2.5-coder:1.5b"
 	}
 	if cfg.Aider.BinPath == "" {
 		cfg.Aider.BinPath = "aider"

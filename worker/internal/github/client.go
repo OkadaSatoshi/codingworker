@@ -118,7 +118,7 @@ func (c *Client) buildPRBody(msg *sqs.Message) string {
 このPRは CodingWorker によって自動生成されました。
 
 **関連Issue**: #%d
-**生成モデル**: Ollama qwen2.5-coder:7b (via Aider)
+**生成モデル**: Ollama qwen2.5-coder:1.5b (via Aider)
 **生成日時**: %s
 
 ### タスク内容

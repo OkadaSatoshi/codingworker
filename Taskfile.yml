@@ -3,8 +3,8 @@ version: '3'
 vars:
   PYTHON_VERSION:
     sh: cat .python-version
-  OLLAMA_MODEL: qwen2.5-coder:7b
-  AIDER_MODEL: ollama_chat/qwen2.5-coder:7b
+  OLLAMA_MODEL: qwen2.5-coder:1.5b
+  AIDER_MODEL: ollama_chat/qwen2.5-coder:1.5b
 
 tasks:
   # =============================================================================

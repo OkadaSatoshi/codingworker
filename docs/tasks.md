@@ -43,7 +43,7 @@
          │ CLI呼び出し
          ▼
 ┌─────────────────┐
-│  Aider + Ollama │ ← ローカルLLM (qwen2.5-coder:7b)
+│  Aider + Ollama │ ← ローカルLLM (qwen2.5-coder:1.5b)
 └────────┬────────┘
          │ 自動コミット
          ▼
@@ -100,13 +100,13 @@
 - [ ] `ollama --version` で動作確認
 - [ ] Ollama サービス起動確認
 
-### 1-2: qwen2.5-coder:7b モデルのダウンロード
-- [ ] `ollama pull qwen2.5-coder:7b` 実行
+### 1-2: qwen2.5-coder:1.5b モデルのダウンロード
+- [ ] `ollama pull qwen2.5-coder:1.5b` 実行
 - [ ] ダウンロード完了確認（約4GB）
 - [ ] `ollama list` でモデル確認
 
 ### 1-3: Ollama 基本動作確認
-- [ ] `ollama run qwen2.5-coder:7b` で対話テスト
+- [ ] `ollama run qwen2.5-coder:1.5b` で対話テスト
 - [ ] 簡単なコード生成プロンプト実行（例: "Write a hello world in Python"）
 - [ ] レスポンス速度を目視確認（目安: 30秒以内）
 - [ ] `Ctrl+D` で終了
@@ -123,7 +123,7 @@
 ### 2-2: Aider + Ollama 連携設定
 - [ ] テスト用ディレクトリ作成: `mkdir ~/aider-test && cd ~/aider-test`
 - [ ] Git初期化: `git init`
-- [ ] Aider起動: `aider --model ollama_chat/qwen2.5-coder:7b`
+- [ ] Aider起動: `aider --model ollama_chat/qwen2.5-coder:1.5b`
 - [ ] 接続成功確認
 
 ### 2-3: Aider 基本動作確認
@@ -195,7 +195,7 @@
 
 #### Pivot 基準（代替案検討）
 - [ ] Aider連携が不安定 → Open Interpreter検証
-- [ ] qwen2.5-coder:7b品質不足 → codellama:7b検証
+- [ ] qwen2.5-coder:1.5b品質不足 → codellama:7b検証
 
 #### Fallback 基準（無料API検討）
 - [ ] ローカルLLM推論が120秒/応答超過
@@ -235,7 +235,7 @@
 
 ## Phase 0 完了判定基準
 
-- [ ] Ollama + qwen2.5-coder:7b が安定動作する
+- [ ] Ollama + qwen2.5-coder:1.5b が安定動作する
 - [ ] Aider が Ollama 経由でコードを生成できる
 - [ ] 生成されたコードが実行可能である
 - [ ] Go/No-Go判断が完了している
@@ -437,7 +437,7 @@ worker/
 ### 14-1: Aider Runner 実装
 - [ ] `internal/aider/runner.go` 作成
 - [ ] Aider CLI 呼び出し処理
-- [ ] コマンド構築: `aider --model ollama_chat/qwen2.5-coder:7b --yes --message "{task}"`
+- [ ] コマンド構築: `aider --model ollama_chat/qwen2.5-coder:1.5b --yes --message "{task}"`
 
 ### 14-2: 作業ディレクトリ管理
 - [ ] リポジトリのクローン処理
@@ -471,7 +471,7 @@ worker/
 このPRは CodingWorker によって自動生成されました。
 
 **関連Issue**: #{issue_number}
-**生成モデル**: Ollama qwen2.5-coder:7b (via Aider)
+**生成モデル**: Ollama qwen2.5-coder:1.5b (via Aider)
 **生成日時**: {timestamp}
 
 ### 確認事項
@@ -692,8 +692,8 @@ worker/
 ## ローカルLLMが実用レベルでない場合
 
 ### 選択肢1: モデル変更
-- qwen2.5-coder:7b → codellama:7b
-- qwen2.5-coder:7b → qwen2.5-coder:3b（軽量版）
+- qwen2.5-coder:1.5b → codellama:7b
+- qwen2.5-coder:1.5b → qwen2.5-coder:3b（軽量版）
 
 ### 選択肢2: ツール変更
 - Aider → Open Interpreter

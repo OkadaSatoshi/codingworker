@@ -54,7 +54,7 @@ worker/
 
 - Go 1.23+
 - Aider (`~/.local/bin/aider`)
-- Ollama + qwen2.5-coder:7b
+- Ollama + qwen2.5-coder:1.5b
 - gh CLI (GitHub CLI)
 - Git
 
@@ -79,7 +79,7 @@ sqs:
   use_mock: true  # 開発時は true、本番では false
 
 aider:
-  model: "ollama_chat/qwen2.5-coder:7b"
+  model: "ollama_chat/qwen2.5-coder:1.5b"
   bin_path: "${HOME}/.local/bin/aider"
 
 github:

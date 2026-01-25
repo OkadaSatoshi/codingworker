@@ -41,7 +41,7 @@ MBP 2018 (Intel Mac) を**自律型コーディングワーカー**として再�
 
 ### 4.1 コア機能
 
-GitHub Issues に起票されたコーディングタスクを、MBP上のローカルLLM（Ollama + qwen2.5-coder:7b）で処理し、自動的にコードを生成してPRを作成する。
+GitHub Issues に起票されたコーディングタスクを、MBP上のローカルLLM（Ollama + qwen2.5-coder:1.5b）で処理し、自動的にコードを生成してPRを作成する。
 
 ### 4.2 主要コンポーネント
 
@@ -65,7 +65,7 @@ GitHub Issues に起票されたコーディングタスクを、MBP上のロー
    ↓
 4. Worker が Docker API 経由で OpenHands コンテナ起動
    ↓
-5. OpenHands がローカル Ollama (qwen2.5-coder:7b) を呼び出し
+5. OpenHands がローカル Ollama (qwen2.5-coder:1.5b) を呼び出し
    ↓
 6. コード生成後、GitHub へ Push し PR作成
 ```
@@ -233,7 +233,7 @@ GitHub Issues に起票されたコーディングタスクを、MBP上のロー
 
 ### 10.1 Phase 0（PoC）
 
-- [x] Ollama + qwen2.5-coder:7b が MBP で動作する
+- [x] Ollama + qwen2.5-coder:1.5b が MBP で動作する
 - [x] OpenHands がローカルLLMを使用してコードを生成できる
 - [x] Intel Mac (16GB RAM) で安定動作する
 
