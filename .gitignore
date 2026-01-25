@@ -15,3 +15,12 @@ worker/testdata/
 *.exe
 coverage.out
 coverage.html
+
+# Terraform
+infra/terraform/.terraform/
+infra/terraform/*.tfstate
+infra/terraform/*.tfstate.*
+infra/terraform/*.tfvars
+!infra/terraform/*.tfvars.example
+# .terraform.lock.hcl はコミット推奨（プロバイダーバージョン固定）
+infra/terraform/crash.log
