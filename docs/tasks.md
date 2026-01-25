@@ -347,7 +347,7 @@ codingworker-infra/
 ### 11-2: OIDC 認証ワークフロー作成
 - [ ] `.github/workflows/send-to-sqs.yml` 作成
 - [ ] OIDC 認証設定
-- [ ] Issue イベントトリガー（`auto-code`ラベル）
+- [ ] Issue イベントトリガー（`ai-task`ラベル）
 
 ### 11-3: SQS メッセージ送信実装
 - [ ] メッセージフォーマット（JSON）作成
@@ -355,7 +355,7 @@ codingworker-infra/
 - [ ] エラーハンドリング
 
 ### 11-4: 連携テスト
-- [ ] テスト用 Issue 作成（`auto-code`ラベル付与）
+- [ ] テスト用 Issue 作成（`ai-task`ラベル付与）
 - [ ] ワークフロー実行確認
 - [ ] SQS にメッセージが届くか確認（AWS Console）
 
@@ -557,7 +557,7 @@ worker/
 ## タスク19: E2E テスト実行
 
 ### 19-1: 正常系テスト
-- [ ] GitHub Issue 作成（`auto-code`ラベル）
+- [ ] GitHub Issue 作成（`ai-task`ラベル）
 - [ ] SQS にメッセージが届くことを確認
 - [ ] Worker が処理することを確認
 - [ ] PR が作成されることを確認

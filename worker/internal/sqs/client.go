@@ -20,6 +20,13 @@ type Message struct {
 	ReceiptHandle string   `json:"-"`
 }
 
+// Label constants
+const (
+	LabelTrigger = "ai-task"        // Triggers worker processing
+	LabelFailed  = "ai-task-failed" // Added on failure
+	LabelDone    = "ai-task-done"   // Added on success (ai-task removed)
+)
+
 // Client handles SQS operations
 type Client struct {
 	config  config.SQSConfig
