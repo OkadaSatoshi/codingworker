@@ -15,7 +15,8 @@ concurrency:
 jobs:
   send-to-sqs:
     # Only run when "ai-task" label is added
-    if: github.event.label.name == 'ai-task'
+    # Requires AWS_ROLE_ARN secret to be set (acts as enable flag)
+    if: github.event.label.name == 'ai-task' && vars.ENABLE_SQS_WORKFLOW == 'true'
 
     runs-on: ubuntu-latest
     timeout-minutes: 5

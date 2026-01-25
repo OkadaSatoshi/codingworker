@@ -14,6 +14,8 @@ env:
 
 jobs:
   test-sqs:
+    # Requires ENABLE_SQS_WORKFLOW variable to be set to 'true'
+    if: vars.ENABLE_SQS_WORKFLOW == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
