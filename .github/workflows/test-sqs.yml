@@ -1,0 +1,80 @@
+name: Test SQS Connection
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_message:
+        description: 'Test message to send'
+        required: false
+        default: 'Hello from GitHub Actions'
+
+env:
+  AWS_REGION: ap-northeast-1
+  SQS_QUEUE_NAME: codingworker-tasks
+
+jobs:
+  test-sqs:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS credentials
+        run: |
+          echo "AWS Identity:"
+          aws sts get-caller-identity
+
+      - name: Get SQS Queue URL
+        id: queue
+        run: |
+          QUEUE_URL=$(aws sqs get-queue-url --queue-name ${{ env.SQS_QUEUE_NAME }} --output text)
+          echo "Queue URL: $QUEUE_URL"
+          echo "url=$QUEUE_URL" >> $GITHUB_OUTPUT
+
+      - name: Get Queue Attributes
+        run: |
+          aws sqs get-queue-attributes \
+            --queue-url "${{ steps.queue.outputs.url }}" \
+            --attribute-names ApproximateNumberOfMessages ApproximateNumberOfMessagesNotVisible
+
+      - name: Send test message
+        run: |
+          MESSAGE=$(jq -n \
+            --argjson issue_number 0 \
+            --arg repository "${{ github.repository }}" \
+            --arg title "Test: ${{ inputs.test_message }}" \
+            --arg body "This is a test message from workflow_dispatch" \
+            --arg created_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{
+              issue_number: $issue_number,
+              repository: $repository,
+              title: $title,
+              body: $body,
+              labels: ["ai-task", "test"],
+              created_at: $created_at
+            }')
+
+          echo "Test message:"
+          echo "$MESSAGE" | jq .
+
+          RESULT=$(aws sqs send-message \
+            --queue-url "${{ steps.queue.outputs.url }}" \
+            --message-body "$MESSAGE")
+
+          echo "Result:"
+          echo "$RESULT" | jq .
+
+      - name: Summary
+        run: |
+          echo "## SQS Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "- Queue: ${{ env.SQS_QUEUE_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Region: ${{ env.AWS_REGION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Status: ✅ Success" >> $GITHUB_STEP_SUMMARY

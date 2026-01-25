@@ -1,0 +1,78 @@
+name: Send Task to SQS
+
+on:
+  issues:
+    types: [labeled]
+
+env:
+  AWS_REGION: ap-northeast-1
+  SQS_QUEUE_NAME: codingworker-tasks
+
+jobs:
+  send-to-sqs:
+    # Only run when "ai-task" label is added
+    if: github.event.label.name == 'ai-task'
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write  # Required for OIDC
+      contents: read
+      issues: read
+
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get SQS Queue URL
+        id: queue
+        run: |
+          QUEUE_URL=$(aws sqs get-queue-url --queue-name ${{ env.SQS_QUEUE_NAME }} --output text)
+          echo "url=$QUEUE_URL" >> $GITHUB_OUTPUT
+
+      - name: Send message to SQS
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          # Create message JSON
+          MESSAGE=$(jq -n \
+            --argjson issue_number "$ISSUE_NUMBER" \
+            --arg repository "$REPOSITORY" \
+            --arg title "$ISSUE_TITLE" \
+            --arg body "$ISSUE_BODY" \
+            --arg created_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{
+              issue_number: $issue_number,
+              repository: $repository,
+              title: $title,
+              body: $body,
+              labels: ["ai-task"],
+              created_at: $created_at
+            }')
+
+          echo "Sending message to SQS:"
+          echo "$MESSAGE" | jq .
+
+          # Send to SQS
+          aws sqs send-message \
+            --queue-url "${{ steps.queue.outputs.url }}" \
+            --message-body "$MESSAGE"
+
+          echo "Message sent successfully!"
+
+      - name: Add comment to issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '🤖 タスクをキューに送信しました。CodingWorker が処理を開始します。'
+            })
