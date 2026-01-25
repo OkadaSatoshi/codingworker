@@ -13,6 +13,7 @@ import (
 	"github.com/OkadaSatoshi/codingworker/worker/internal/aider"
 	"github.com/OkadaSatoshi/codingworker/worker/internal/config"
 	"github.com/OkadaSatoshi/codingworker/worker/internal/github"
+	"github.com/OkadaSatoshi/codingworker/worker/internal/retry"
 	"github.com/OkadaSatoshi/codingworker/worker/internal/sqs"
 )
 
@@ -153,27 +154,40 @@ func (w *Worker) processNextMessage(ctx context.Context) error {
 		"title", msg.Title,
 	)
 
-	// 2. Clone repository and create branch
-	workDir, err := w.github.CloneAndBranch(ctx, msg.Repository, msg.IssueNumber)
-	if err != nil {
-		return fmt.Errorf("clone failed: %w", err)
-	}
-	defer os.RemoveAll(workDir)
+	// Execute with retry policy
+	policy := retry.DefaultPolicy()
+	var prURL string
 
-	// 3. Run Aider to generate code
-	if err := w.aider.Run(ctx, workDir, msg.Title, msg.Body); err != nil {
-		return fmt.Errorf("aider failed: %w", err)
-	}
+	result := policy.Do(ctx, func() error {
+		var err error
+		prURL, err = w.processTask(ctx, msg)
+		return err
+	})
 
-	// 4. Push and create PR
-	prURL, err := w.github.PushAndCreatePR(ctx, workDir, msg)
-	if err != nil {
-		return fmt.Errorf("pr creation failed: %w", err)
+	if result.LastErr != nil {
+		slog.Error("Task failed after retries",
+			"issue_number", msg.IssueNumber,
+			"attempts", result.Attempts,
+			"error", result.LastErr,
+		)
+
+		// Post failure comment to Issue
+		comment := w.buildFailureComment(result.LastErr, result.Attempts)
+		if err := w.github.AddComment(ctx, msg.Repository, msg.IssueNumber, comment); err != nil {
+			slog.Error("Failed to post failure comment", "error", err)
+		}
+
+		// Delete message from SQS (don't retry indefinitely)
+		if err := w.sqs.DeleteMessage(ctx, msg.ReceiptHandle); err != nil {
+			slog.Error("Failed to delete message after failure", "error", err)
+		}
+
+		return result.LastErr
 	}
 
 	slog.Info("PR created", "url", prURL)
 
-	// 5. Delete message from SQS
+	// Delete message from SQS
 	if err := w.sqs.DeleteMessage(ctx, msg.ReceiptHandle); err != nil {
 		return fmt.Errorf("message deletion failed: %w", err)
 	}
@@ -181,7 +195,47 @@ func (w *Worker) processNextMessage(ctx context.Context) error {
 	slog.Info("Task completed successfully",
 		"issue_number", msg.IssueNumber,
 		"pr_url", prURL,
+		"attempts", result.Attempts,
 	)
 
 	return nil
+}
+
+// buildFailureComment creates a comment body for failed tasks
+func (w *Worker) buildFailureComment(err error, attempts int) string {
+	return fmt.Sprintf(`## ⚠️ CodingWorker: タスク処理に失敗しました
+
+**試行回数**: %d
+**エラー内容**:
+`+"```"+`
+%v
+`+"```"+`
+
+---
+このコメントは CodingWorker によって自動生成されました。
+`, attempts, err)
+}
+
+// processTask executes the actual work (clone, aider, push, PR)
+func (w *Worker) processTask(ctx context.Context, msg *sqs.Message) (string, error) {
+	// 2. Clone repository and create branch
+	workDir, err := w.github.CloneAndBranch(ctx, msg.Repository, msg.IssueNumber)
+	if err != nil {
+		return "", fmt.Errorf("clone failed: %w", err)
+	}
+	defer os.RemoveAll(workDir)
+
+	// 3. Run Aider to generate code
+	if err := w.aider.Run(ctx, workDir, msg.Title, msg.Body); err != nil {
+		// Aider failures are typically permanent (code generation issues)
+		return "", &retry.PermanentError{Err: fmt.Errorf("aider failed: %w", err)}
+	}
+
+	// 4. Push and create PR
+	prURL, err := w.github.PushAndCreatePR(ctx, workDir, msg)
+	if err != nil {
+		return "", fmt.Errorf("pr creation failed: %w", err)
+	}
+
+	return prURL, nil
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 )
 
@@ -94,6 +95,7 @@ func (p *Policy) Do(ctx context.Context, operation func() error) *Result {
 
 		err := operation()
 		if err == nil {
+			result.LastErr = nil // Clear any previous error on success
 			return result
 		}
 
@@ -146,4 +148,61 @@ func (p *Policy) Do(ctx context.Context, operation func() error) *Result {
 // IsRetryExhausted returns true if all retries were used
 func (r *Result) IsRetryExhausted() bool {
 	return r.Attempts > DefaultPolicy().MaxRetries && r.LastErr != nil
+}
+
+// ClassifyHTTPStatus returns the error type based on HTTP status code
+func ClassifyHTTPStatus(statusCode int) ErrorType {
+	switch {
+	case statusCode == 429:
+		// Rate limit - retry after backoff
+		return ErrorTypeTransient
+	case statusCode >= 500 && statusCode < 600:
+		// Server error - retry
+		return ErrorTypeTransient
+	case statusCode >= 400 && statusCode < 500:
+		// Client error (except 429) - don't retry
+		return ErrorTypePermanent
+	default:
+		// Success or unknown - don't retry
+		return ErrorTypePermanent
+	}
+}
+
+// ClassifyGitError classifies git/gh CLI output for retry decisions
+func ClassifyGitError(output string) ErrorType {
+	// Transient errors (network, rate limit, server issues)
+	transientPatterns := []string{
+		"Could not resolve host",
+		"Connection refused",
+		"Connection timed out",
+		"rate limit",
+		"API rate limit",
+		"503",
+		"502",
+		"500",
+		"temporarily unavailable",
+		"try again later",
+	}
+
+	for _, pattern := range transientPatterns {
+		if strings.Contains(strings.ToLower(output), strings.ToLower(pattern)) {
+			return ErrorTypeTransient
+		}
+	}
+
+	// Default to permanent for client errors
+	return ErrorTypePermanent
+}
+
+// WrapWithClassification wraps an error with appropriate retry classification
+func WrapWithClassification(err error, output string) error {
+	if err == nil {
+		return nil
+	}
+
+	errType := ClassifyGitError(output)
+	if errType == ErrorTypeTransient {
+		return &TransientError{Err: err}
+	}
+	return &PermanentError{Err: err}
 }

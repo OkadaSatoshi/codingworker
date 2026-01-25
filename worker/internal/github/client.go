@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/OkadaSatoshi/codingworker/worker/internal/config"
+	"github.com/OkadaSatoshi/codingworker/worker/internal/retry"
 	"github.com/OkadaSatoshi/codingworker/worker/internal/sqs"
 )
 
@@ -44,7 +45,8 @@ func (c *Client) CloneAndBranch(ctx context.Context, repository string, issueNum
 
 	cmd := exec.CommandContext(ctx, "git", "clone", "--depth", "1", repoURL, workDir)
 	if output, err := cmd.CombinedOutput(); err != nil {
-		return "", fmt.Errorf("git clone failed: %w, output: %s", err, string(output))
+		wrapped := retry.WrapWithClassification(err, string(output))
+		return "", fmt.Errorf("git clone failed: %w, output: %s", wrapped, string(output))
 	}
 
 	// Create and checkout new branch
@@ -88,7 +90,8 @@ func (c *Client) PushAndCreatePR(ctx context.Context, workDir string, msg *sqs.M
 	cmd = exec.CommandContext(ctx, "git", "push", "-u", "origin", branchName)
 	cmd.Dir = workDir
 	if output, err := cmd.CombinedOutput(); err != nil {
-		return "", fmt.Errorf("git push failed: %w, output: %s", err, string(output))
+		wrapped := retry.WrapWithClassification(err, string(output))
+		return "", fmt.Errorf("git push failed: %w, output: %s", wrapped, string(output))
 	}
 
 	// Create PR using gh CLI
@@ -104,11 +107,30 @@ func (c *Client) PushAndCreatePR(ctx context.Context, workDir string, msg *sqs.M
 	cmd.Dir = workDir
 	prOutput, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("gh pr create failed: %w, output: %s", err, string(prOutput))
+		wrapped := retry.WrapWithClassification(err, string(prOutput))
+		return "", fmt.Errorf("gh pr create failed: %w, output: %s", wrapped, string(prOutput))
 	}
 
 	prURL := strings.TrimSpace(string(prOutput))
 	return prURL, nil
+}
+
+// AddComment adds a comment to an issue
+func (c *Client) AddComment(ctx context.Context, repository string, issueNumber int, body string) error {
+	// Use gh CLI to add comment
+	cmd := exec.CommandContext(ctx, "gh", "issue", "comment",
+		fmt.Sprintf("%d", issueNumber),
+		"--repo", repository,
+		"--body", body,
+	)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("gh issue comment failed: %w, output: %s", err, string(output))
+	}
+
+	slog.Info("Comment added to issue", "repository", repository, "issue", issueNumber)
+	return nil
 }
 
 // buildPRBody creates the PR description

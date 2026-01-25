@@ -22,8 +22,13 @@ type SQSConfig struct {
 }
 
 type AiderConfig struct {
-	Model   string `yaml:"model"`
-	BinPath string `yaml:"bin_path"`
+	Models    []ModelConfig `yaml:"models"`
+	BinPath   string        `yaml:"bin_path"`
+	MapTokens int           `yaml:"map_tokens"`
+}
+
+type ModelConfig struct {
+	Name    string `yaml:"name"`
 	Timeout int    `yaml:"timeout_seconds"`
 }
 
@@ -58,14 +63,19 @@ func Load(path string) (*Config, error) {
 	if cfg.SQS.VisibilityTimeout == 0 {
 		cfg.SQS.VisibilityTimeout = 3600
 	}
-	if cfg.Aider.Model == "" {
-		cfg.Aider.Model = "ollama_chat/qwen2.5-coder:1.5b"
+	if len(cfg.Aider.Models) == 0 {
+		cfg.Aider.Models = []ModelConfig{
+			{Name: "ollama_chat/qwen2.5-coder:3b", Timeout: 900},
+			{Name: "ollama_chat/qwen2.5-coder:1.5b", Timeout: 900},
+		}
+	}
+	for i := range cfg.Aider.Models {
+		if cfg.Aider.Models[i].Timeout == 0 {
+			cfg.Aider.Models[i].Timeout = 900 // 15分
+		}
 	}
 	if cfg.Aider.BinPath == "" {
 		cfg.Aider.BinPath = "aider"
-	}
-	if cfg.Aider.Timeout == 0 {
-		cfg.Aider.Timeout = 3600
 	}
 	if cfg.Worker.MaxRetries == 0 {
 		cfg.Worker.MaxRetries = 3

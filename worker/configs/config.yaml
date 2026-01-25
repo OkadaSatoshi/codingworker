@@ -6,9 +6,13 @@ sqs:
   use_mock: true  # Set to false when using real AWS SQS
 
 aider:
-  model: "ollama_chat/qwen2.5-coder:1.5b"
   bin_path: "${HOME}/.local/bin/aider"
-  timeout_seconds: 3600
+  map_tokens: 0
+  models:
+    - name: "ollama_chat/qwen2.5-coder:3b"
+      timeout_seconds: 900  # 15分
+    - name: "ollama_chat/qwen2.5-coder:1.5b"
+      timeout_seconds: 900  # 15分
 
 github:
   token: "${GITHUB_TOKEN}"
