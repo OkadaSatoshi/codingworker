@@ -5,45 +5,40 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strconv"
+	"strings"
 )
 
-type Person struct {
-	Name string
-	Age  int
-	City string
-}
-
-func (p Person) Less(other Person) bool {
-	return p.Name < other.Name
-}
-
 func main() {
+	// Open the CSV file
 	file, err := os.Open("sample.csv")
 	if err != nil {
-		fmt.Println("Error opening file:", err)
+		fmt.Println("Error opening CSV file:", err)
 		return
 	}
 	defer file.Close()
 
+	// Create a CSV reader
 	reader := csv.NewReader(file)
-	records, err := reader.ReadAll()
+
+	// Read all records from the CSV file
+	allRecords, err := reader.ReadAll()
 	if err != nil {
-		fmt.Println("Error reading CSV:", err)
+		fmt.Println("Error reading CSV file:", err)
 		return
 	}
 
-	people := make([]Person, len(records)-1) // Skip the header row
-	for i, record := range records[1:] {
-		age, _ := strconv.Atoi(record[1])
-		people[i] = Person{Name: record[0], Age: age, City: record[2]}
-	}
+	// Sort the records by the "name" column using integer index 0
+	sortedRecords := sortRecords(allRecords, 0)
 
-	sort.Slice(people, func(i, j int) bool {
-		return people[i].Less(people[j])
+	// Print the sorted records to stdout
+	for _, record := range sortedRecords {
+		fmt.Printf("%s\n", strings.Join(record, ","))
+	}
+}
+
+func sortRecords(records [][]string, key int) [][]string {
+	sort.Slice(records, func(i, j int) bool {
+		return records[i][key] < records[j][key]
 	})
-
-	for _, person := range people {
-		fmt.Printf("%s,%d,%s\n", person.Name, person.Age, person.City)
-	}
+	return records
 }

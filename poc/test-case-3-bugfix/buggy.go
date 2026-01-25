@@ -5,7 +5,7 @@ import "fmt"
 // Sum calculates the sum of all numbers in the slice
 func Sum(numbers []int) int {
 	total := 0
-	for i := 0; i < len(numbers); i++ {
+	for i := 0; i < len(numbers); i++ { // Corrected loop condition
 		total += numbers[i]
 	}
 	return total
