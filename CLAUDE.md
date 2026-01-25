@@ -10,7 +10,9 @@ Goal: GitHub Issues → GitHub Actions → AWS SQS → Go Worker → Aider + Oll
 ### Tool Selection
 - **Aider** (not OpenHands): Chosen for lighter weight, no Docker required, CLI-based
 - **Ollama**: Local LLM runtime
-- **Model**: `qwen2.5-coder:1.5b` (for MBP 2018 compatibility, CPU inference optimized)
+- **Model**:
+  - M4 Mac: `qwen2.5-coder:7b` (高速、高品質)
+  - Intel Mac (MBP 2018): `qwen2.5-coder:1.5b` (7Bは動作せず)
 - **uv**: Python package manager (not pip) for isolated Aider installation
 - **mise**: Tool version manager for Go
 - **Taskfile**: Task automation (not Makefile)

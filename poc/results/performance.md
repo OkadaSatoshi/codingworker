@@ -73,43 +73,58 @@
 
 ---
 
-## MBP 2018 での検証結果（進行中）
+## MBP 2018 での検証結果（2025-01-25）
 
 ### テスト環境
 
 - **マシン**: MacBook Pro 2018 (Intel Core i7, 16GB RAM)
 - **OS**: macOS
-- **Ollama**: ___
-- **Model**: qwen2.5-coder:7b
-- **Aider**: ___
+- **Ollama**: 0.14.x
+- **Model**: qwen2.5-coder:1.5b（7bは動作せず）
+- **Aider**: 0.86.x
 
 ### 判明した課題
 
-1. **repo-map処理が遅い**: CPU推論が遅く、repo-mapの処理でタイムアウト
-2. **環境変数**: `OLLAMA_API_BASE` の設定が必要な場合あり
+1. **7Bモデルは動作しない**: repo-map処理でタイムアウト、CPU推論が遅すぎる
+2. **1.5Bモデルで解決**: 軽量モデルに変更することで動作確認
 
 ### 推奨設定（Intel Mac）
 
 ```bash
-# 環境変数
-export OLLAMA_API_BASE=http://127.0.0.1:11434
+# 軽量モデルをダウンロード
+ollama pull qwen2.5-coder:1.5b
 
-# repo-mapを無効化して軽量化
-~/.local/bin/aider --model ollama_chat/qwen2.5-coder:7b --map-tokens 0
-
-# またはより軽量なモデルを使用
-ollama pull qwen2.5-coder:3b
-~/.local/bin/aider --model ollama_chat/qwen2.5-coder:3b
+# Aider起動
+~/.local/bin/aider --model ollama_chat/qwen2.5-coder:1.5b
 ```
 
 ### テスト結果
 
-（検証中）
+| 項目 | 結果 |
+|:---|:---|
+| モデル | qwen2.5-coder:1.5b |
+| 動作 | ✅ 成功 |
+| 備考 | 7Bは動作せず、1.5Bで動作確認 |
+
+### Go/No-Go 判断
+
+**結果**: ✅ Go（1.5Bモデル使用条件）
+
+**理由**:
+- 1.5Bモデルで動作確認
+- Intel Macでも実用可能
 
 ---
+
+## 推奨モデル一覧
+
+| 環境 | 推奨モデル | 備考 |
+|:---|:---|:---|
+| M4 Mac (Apple Silicon) | qwen2.5-coder:7b | 高速、高品質 |
+| MBP 2018 (Intel) | qwen2.5-coder:1.5b | 7Bは動作せず |
 
 ## 備考
 
 - M4 MacBook Pro: Apple Silicon の高速推論により快適に動作
-- MBP 2018 (Intel): CPU推論のため低速、設定調整が必要
-- 7Bモデルは Intel Mac では厳しい可能性、3Bモデル推奨
+- MBP 2018 (Intel): CPU推論のため1.5Bモデル必須
+- 7Bモデルは Intel Mac では動作しない
