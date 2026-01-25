@@ -8,12 +8,17 @@ env:
   AWS_REGION: ap-northeast-1
   SQS_QUEUE_NAME: codingworker-tasks
 
+concurrency:
+  group: sqs-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
 jobs:
   send-to-sqs:
     # Only run when "ai-task" label is added
     if: github.event.label.name == 'ai-task'
 
     runs-on: ubuntu-latest
+    timeout-minutes: 5
 
     permissions:
       id-token: write  # Required for OIDC
