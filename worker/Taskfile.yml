@@ -13,10 +13,12 @@ tasks:
     cmds:
       - mkdir -p {{.BUILD_DIR}}
       - mise exec -- go build -o {{.BUILD_DIR}}/{{.BINARY_NAME}} ./cmd/worker
+      - mise exec -- go build -o {{.BUILD_DIR}}/inject ./cmd/inject
     sources:
       - ./**/*.go
     generates:
       - "{{.BUILD_DIR}}/{{.BINARY_NAME}}"
+      - "{{.BUILD_DIR}}/inject"
 
   # =============================================================================
   # Run
@@ -31,6 +33,40 @@ tasks:
     desc: 開発モードで実行（ビルドなし）
     cmds:
       - mise exec -- go run ./cmd/worker
+
+  run:test:
+    desc: テストメッセージで実行
+    deps: [build]
+    cmds:
+      - |
+        if [ ! -f testdata/message.json ]; then
+          echo "Error: testdata/message.json not found"
+          echo "Run 'task inject:create' first"
+          exit 1
+        fi
+      - "{{.BUILD_DIR}}/{{.BINARY_NAME}} -test-message testdata/message.json -log-level debug"
+
+  # =============================================================================
+  # Inject (Test Message)
+  # =============================================================================
+  inject:create:
+    desc: テストメッセージを作成
+    deps: [build]
+    cmds:
+      - mkdir -p testdata
+      - |
+        {{.BUILD_DIR}}/inject \
+          -repo "{{.TEST_REPO | default "OkadaSatoshi/codingworker-sandbox"}}" \
+          -issue {{.TEST_ISSUE | default 1}} \
+          -title "{{.TEST_TITLE | default "Create hello.go"}}" \
+          -body "{{.TEST_BODY | default "Create a simple hello world program in Go"}}" \
+          -output testdata/message.json
+      - echo "Test message created at testdata/message.json"
+
+  inject:show:
+    desc: テストメッセージを表示
+    cmds:
+      - cat testdata/message.json 2>/dev/null || echo "No test message found. Run 'task inject:create' first"
 
   # =============================================================================
   # Test

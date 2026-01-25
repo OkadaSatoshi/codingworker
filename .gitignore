@@ -10,6 +10,8 @@
 # Go build artifacts
 worker/bin/
 worker/worker
+worker/.task/
+worker/testdata/
 *.exe
 coverage.out
 coverage.html
