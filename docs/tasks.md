@@ -4,8 +4,7 @@
 
 - **プロジェクト名**: CodingWorker
 - **目的**: API費用ゼロの自動コーディングシステム構築
-- **期間**: 約10-15日
-- **現在のフェーズ**: Phase 0
+- **期間**: Phase 0-4: 約10-15日 / Phase 5-6: +7-9日
 - **コーディングエージェント**: Aider（旧: OpenHands）
 
 ---
@@ -16,6 +15,8 @@
 |:---|:---|:---|
 | v1 | 2025-01-25 | 初版作成（OpenHands版） |
 | v2 | 2025-01-25 | Aider版に変更、Docker不要化、タスク簡素化 |
+| v2.4 | 2025-01-26 | Phase 5 (TypeScript対応)、Phase 6 (PRコメント対応) 追加 |
+| v2.5 | 2025-01-26 | Phase 5 をコンテナ実行対応に変更、Phase 7 (Workerコンテナ化) 追加 |
 
 ---
 
@@ -63,10 +64,14 @@
 | Phase 2: SQS連携・ワーカー | 🟡 進行中 | 90% | 3-4日 |
 | Phase 3: E2E統合テスト | ⚪ 未着手 | 0% | 2-3日 |
 | Phase 4: 運用基盤整備 | ⚪ 未着手 | 0% | 1-2日 |
+| Phase 5: コンテナ実行対応 | ⚪ 将来 | 0% | 4-5日 |
+| Phase 6: PRコメント対応 | ⚪ 将来 | 0% | 4日 |
+| Phase 7: Workerコンテナ化 | ⚪ 将来 | 0% | 2-3日 |
 
 **注記**:
 - Phase 1: Terraformコード完了、`terraform apply` 未実行
 - Phase 2: Worker実装完了、Mock SQS統合テスト残
+- Phase 5-7: 将来タスク（Phase 4完了後に着手）
 
 ---
 
@@ -732,18 +737,531 @@ worker/
 # 将来の拡張タスク（オプション）
 
 ### 短期（3ヶ月以内）
+- [ ] **Phase 5: コンテナ実行対応（詳細は下記）**
+- [ ] **Phase 6: PRコメント対応（詳細は下記）**
+- [ ] **Phase 7: Workerコンテナ化（詳細は下記）**
 - [ ] 複数プロジェクトの並行処理機能
-- [ ] Web UI（タスク管理画面）
 - [ ] Slack/Discord 通知連携
 
 ### 中期（6ヶ月以内）
-- [ ] Apple Silicon Mac への移行
+- [ ] Web UI（タスク管理画面）
 - [ ] より高性能なローカルLLM対応
-- [ ] 自動テスト実行機能
+- [ ] E2Eテスト対応（Playwright）
+
+---
+
+# Phase 5: コンテナ実行対応
+
+**期間**: 4-5日
+**目的**: pj-x（対象プロジェクト）のビルド・テストを Docker コンテナ内で実行し、ECS+Fargate 本番環境との一貫性を担保する
+**前提**: Phase 4 完了後
+
+---
+
+## 背景
+
+- pj-x は全て ECS + Fargate 上で動作する想定
+- つまり pj-x は全て Dockerfile を持つ
+- 本番環境と同じコンテナ内でビルド・テストを実行したい
+
+## アーキテクチャ
+
+**Phase 5 では Worker はホスト上で動作し、pj-x のみコンテナ化します。**
+（Worker 自体のコンテナ化は Phase 7 で対応）
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      ホストマシン                             │
+│                                                              │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  Worker (ホスト上で動作)                              │   │
+│  │  Go Worker + Aider                                   │   │
+│  │      │                                               │   │
+│  │      │ docker build / docker run                     │   │
+│  │      ▼                                               │   │
+│  │  ┌──────────────────────────────────────────────┐   │   │
+│  │  │              Docker デーモン                  │   │   │
+│  │  │                                              │   │   │
+│  │  │   ┌────────────────────────────────────┐    │   │   │
+│  │  │   │         pj-x コンテナ               │    │   │   │
+│  │  │   │         build/test 実行            │    │   │   │
+│  │  │   └────────────────────────────────────┘    │   │   │
+│  │  └──────────────────────────────────────────────┘   │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │                  Ollama (Metal GPU)                   │  │
+│  │                  localhost:11434                      │  │
+│  └──────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## 設計方針: 規約ベースの Docker 実行
+
+### 規約ファイル: `.codingworker.yml`
+
+pj-x のリポジトリルートに配置し、ビルド・テスト方法を定義する。
+
+```yaml
+# pj-x/.codingworker.yml
+
+# ビルドコマンド
+build:
+  command: "docker build -t ${IMAGE_NAME} ."
+  # または: "docker compose build"
+
+# テストコマンド
+test:
+  command: "docker run --rm ${IMAGE_NAME} go test ./..."
+  # または: "docker compose run --rm test"
+  # または: "docker build --target test ."
+
+# リントコマンド（オプション）
+lint:
+  command: "docker run --rm ${IMAGE_NAME} golangci-lint run"
+```
+
+### 変数展開
+
+| 変数 | 説明 |
+|------|------|
+| `${IMAGE_NAME}` | `codingworker-{repo}-{issue}` 形式で自動生成 |
+| `${WORK_DIR}` | クローン先ディレクトリ |
+
+### デフォルト動作（.codingworker.yml がない場合）
+
+| 検出 | デフォルト動作 |
+|------|----------------|
+| `Dockerfile` あり | `docker build` → `docker run make test` |
+| `docker-compose.yml` あり | `docker compose build` → `docker compose run test` |
+| どちらもなし | **従来のネイティブ実行にフォールバック** |
+
+---
+
+## タスク24: DockerRunner 実装
+
+### 24-1: 規約ファイルパーサー
+- [ ] `.codingworker.yml` の構造体定義
+- [ ] YAML パーサー実装
+- [ ] 変数展開処理 (`${IMAGE_NAME}` 等)
+
+### 24-2: DockerRunner 実装
+- [ ] `internal/docker/runner.go` 作成
+- [ ] `docker build` コマンド実行
+- [ ] `docker run` コマンド実行
+- [ ] コンテナ後処理（`docker rm`）
+
+### 24-3: 既存コードとの統合
+- [ ] `aider/runner.go` の検証処理を DockerRunner に委譲
+- [ ] フォールバック処理（設定なし時は従来動作）
+
+---
+
+## タスク25: Docker 連携
+
+### 25-1: Docker CLI 実行
+- [ ] Docker コマンドのラッパー関数
+- [ ] ビルドログの取得・出力
+- [ ] エラーハンドリング（ビルド失敗、テスト失敗の判別）
+
+### 25-2: イメージ管理
+- [ ] イメージ名の自動生成ロジック
+- [ ] 処理完了後のイメージクリーンアップ（オプション）
+
+---
+
+## タスク26: テスト・検証
+
+### 26-1: PoC テストケース
+- [ ] Go プロジェクト用 `.codingworker.yml` サンプル
+- [ ] TypeScript プロジェクト用 `.codingworker.yml` サンプル
+- [ ] マルチステージビルドの動作確認
+
+### 26-2: 統合テスト
+- [ ] Docker ビルド → テスト → PR 作成の E2E テスト
+- [ ] フォールバック動作の確認
+
+---
+
+## タスク27: オプション（将来）
+
+- [ ] docker-compose.yml からのコマンド自動検出
+- [ ] ビルドキャッシュの活用
+- [ ] 並列テスト実行
+
+---
+
+## 設定例
+
+### Go プロジェクト
+
+```yaml
+# pj-go/.codingworker.yml
+build:
+  command: "docker build -t ${IMAGE_NAME} ."
+test:
+  command: "docker run --rm ${IMAGE_NAME} go test -v ./..."
+lint:
+  command: "docker run --rm ${IMAGE_NAME} golangci-lint run"
+```
+
+### TypeScript (React/Vite) プロジェクト
+
+```yaml
+# pj-ts/.codingworker.yml
+build:
+  command: "docker build -t ${IMAGE_NAME} --target builder ."
+test:
+  command: "docker run --rm ${IMAGE_NAME} pnpm test"
+lint:
+  command: "docker run --rm ${IMAGE_NAME} pnpm biome check ."
+```
+
+### マルチステージ + docker-compose
+
+```yaml
+# pj-complex/.codingworker.yml
+build:
+  command: "docker compose build"
+test:
+  command: "docker compose run --rm app pnpm test"
+```
+
+## Phase 5 完了判定基準
+
+- [ ] `.codingworker.yml` が正しくパースされる
+- [ ] Docker 経由でビルド・テストが実行される
+- [ ] 設定ファイルがない場合、従来のネイティブ実行にフォールバック
+- [ ] PoC テストケースが成功する
+
+---
+
+# Phase 6: PRコメント対応
+
+**期間**: 4日
+**目的**: PRにコメントがついたときにSQSにエンキューし、Aiderで追加対応（レビュー指摘への修正）を行う
+**前提**: Phase 5 完了後（Issue起票フローが安定稼働していること）
+
+---
+
+## 処理フロー
+
+```
+【現在: Issue起票フロー】
+Issue (ai-task) → SQS → Worker → clone → 新規ブランチ → Aider → PR作成
+
+【追加: PRコメントフロー】
+PRコメント (@ai-fix) → SQS → Worker → clone → 既存ブランチ checkout → Aider → push
+```
+
+## 拡張メッセージフォーマット
+
+```json
+{
+  "type": "pr_comment",
+  "issue_number": 123,
+  "pr_number": 45,
+  "branch_name": "auto-code/issue-123",
+  "repository": "owner/repo",
+  "title": "Fix: レビュー対応",
+  "body": "変数名をわかりやすく変更してください",
+  "comment_id": 98765,
+  "comment_author": "reviewer",
+  "labels": ["ai-task"],
+  "created_at": "2025-01-26T00:00:00Z"
+}
+```
+
+| フィールド | 型 | 新規 | 説明 |
+|-----------|-----|------|------|
+| type | string | ✅ | `"issue"` / `"pr_comment"` |
+| pr_number | number | ✅ | PR番号 |
+| branch_name | string | ✅ | 対象ブランチ名 |
+| comment_id | number | ✅ | 重複処理防止用 |
+| comment_author | string | ✅ | ボット判定用 |
+
+---
+
+## 課題と対策
+
+### 1. 無限ループ防止 🔴 重要
+
+| リスク | 対策 |
+|--------|------|
+| ボットコミット→CI失敗→自動コメント→再トリガー | コメント作成者がボットなら無視 |
+| 修正不十分→指摘→再トリガー... | 同一comment_idは処理済みとしてスキップ |
+
+```yaml
+# GitHub Actions での判定
+if: |
+  github.event.comment.user.login != 'github-actions[bot]' &&
+  contains(github.event.comment.body, '@ai-fix')
+```
+
+### 2. トリガー条件
+
+- `@ai-fix` プレフィックス付きコメントのみ対応
+- 一般コメント (`issue_comment`) のみ（レビューコメントは対象外）
+- ボットのコメントは無視
+
+### 3. shallow clone 問題
+
+| 現在 | PRコメント対応時 |
+|------|------------------|
+| `git clone --depth 1` | `git fetch origin {branch}:{branch}` で該当ブランチのみ取得 |
+
+### 4. 1.5Bモデルの限界
+
+| コメント種別 | 対応可能性 |
+|-------------|-----------|
+| 「関数名を `calcTotal` に変更して」 | ◎ 高い |
+| 「エラーハンドリングを追加して」 | ○ 可能 |
+| 「なぜこの実装にしたの？」 | × 不可（質問） |
+| 「もっと効率的に」 | △ 曖昧 |
+
+**運用ルール**: 具体的な指示のみ `@ai-fix` で依頼
+
+### 5. コンフリクト対応
+
+| 状況 | 対策 |
+|------|------|
+| 他者が先にpush | `git pull --rebase` してからAider実行 |
+| mainとコンフリクト | エラー通知して手動対応（自動リベースは危険） |
+
+---
+
+## タスク28: メッセージ・ワークフロー拡張
+
+### 28-1: メッセージフォーマット拡張
+- [ ] `sqs.Message` 構造体に `Type`, `PRNumber`, `BranchName`, `CommentID`, `CommentAuthor` 追加
+
+### 28-2: GitHub Actions 拡張
+- [ ] `.github/workflows/pr-comment-to-sqs.yml` 作成
+- [ ] `issue_comment` イベントトリガー設定
+- [ ] `@ai-fix` プレフィックス判定
+
+---
+
+## タスク29: Worker 処理分岐
+
+### 29-1: 処理分岐実装
+- [ ] `cmd/worker/main.go` に `type` による振り分け追加
+- [ ] `github/client.go` に `CheckoutExistingBranch()` 追加
+
+### 29-2: 無限ループ防止
+- [ ] 処理済みコメントID管理（インメモリ or ファイル）
+
+---
+
+## タスク30: 統合テスト
+
+- [ ] Mock SQS での統合テスト
+- [ ] PRコメント→修正→プッシュのE2Eテスト
+
+---
+
+## タスク31: オプション（将来）
+
+- [ ] レビューコメント (`pull_request_review_comment`) 対応
+- [ ] 複数コメントのバッチ処理
+- [ ] コメント種別の自動判定（質問 vs 指示）
+
+---
+
+## Phase 6 完了判定基準
+
+- [ ] `@ai-fix` 付きPRコメントがSQSにエンキューされる
+- [ ] Workerが既存ブランチをチェックアウトして修正できる
+- [ ] 修正が同一PRにプッシュされる
+- [ ] ボットコメントによる無限ループが発生しない
+
+---
+
+# Phase 7: Worker コンテナ化
+
+**期間**: 2-3日
+**目的**: Worker 自体をコンテナ化し、メイン機のローカル環境を汚さずに実行できるようにする
+**前提**: Phase 5 完了後（Docker 実行基盤が整っていること）
+
+---
+
+## 背景
+
+- メイン機（MBP M4）でもWorkerを動かしたい
+- ローカル環境（Go, Python, Aider等）を汚したくない
+- Ollama はホスト側で動作（Metal GPU 利用のため）
+
+## アーキテクチャ
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   ホストマシン (MBP M4)                       │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │                   OrbStack / Docker                   │  │
+│  │                                                        │  │
+│  │   ┌─────────────────────────────────────────────┐    │  │
+│  │   │           Worker コンテナ                     │    │  │
+│  │   │                                              │    │  │
+│  │   │  Go Worker + Python + Aider + Docker CLI    │    │  │
+│  │   │                                              │    │  │
+│  │   │  - SQS ポーリング                            │    │  │
+│  │   │  - Aider 実行 → Ollama API 呼び出し          │    │  │
+│  │   │  - docker コマンド → ホストの Docker 操作    │    │  │
+│  │   │                                              │    │  │
+│  │   └──────────────┬───────────────────────────────┘    │  │
+│  │                  │ /var/run/docker.sock マウント       │  │
+│  │                  ▼                                     │  │
+│  │   ┌─────────────────────────────────────────────┐    │  │
+│  │   │           pj-x コンテナ（兄弟）              │    │  │
+│  │   │           ビルド・テスト実行                 │    │  │
+│  │   └─────────────────────────────────────────────┘    │  │
+│  └──────────────────────────────────────────────────────┘  │
+│                          │                                  │
+│  ┌───────────────────────▼──────────────────────────────┐  │
+│  │              Ollama (Metal GPU)                       │  │
+│  │              host.docker.internal:11434               │  │
+│  └──────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## 技術選定
+
+| 項目 | 選択 | 理由 |
+|------|------|------|
+| コンテナランタイム | OrbStack | 最速・最軽量、Free プランあり |
+| Ollama 配置 | ホスト側 | Metal GPU 利用（コンテナ内では CPU のみ） |
+| Docker Socket | マウント | Worker から pj-x コンテナを起動するため (DooD) |
+
+---
+
+## タスク32: Dockerfile 作成
+
+### 32-1: Worker Dockerfile
+- [ ] `worker/Dockerfile` 作成
+- [ ] ベースイメージ選定（golang:1.23-bookworm 等）
+- [ ] Python + Aider インストール
+- [ ] Docker CLI インストール（DooD 用）
+
+### 32-2: マルチステージビルド
+- [ ] builder ステージ（Go バイナリビルド）
+- [ ] runtime ステージ（実行環境のみ）
+
+### Dockerfile 案
+
+```dockerfile
+# worker/Dockerfile
+
+# === Builder Stage ===
+FROM golang:1.23-bookworm AS builder
+
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN CGO_ENABLED=0 go build -o /worker ./cmd/worker
+
+# === Runtime Stage ===
+FROM python:3.12-slim-bookworm
+
+# Docker CLI インストール (DooD用)
+RUN apt-get update && apt-get install -y \
+    docker.io \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Aider インストール
+RUN pip install --no-cache-dir aider-chat
+
+# Worker バイナリコピー
+COPY --from=builder /worker /usr/local/bin/worker
+
+# 設定ファイル
+COPY configs/config.yaml /etc/codingworker/config.yaml
+
+WORKDIR /workspace
+ENTRYPOINT ["worker"]
+```
+
+---
+
+## タスク33: 実行環境整備
+
+### 33-1: docker-compose.yml
+- [ ] `docker-compose.yml` 作成
+- [ ] Docker Socket マウント設定
+- [ ] Ollama 接続設定（host.docker.internal）
+- [ ] 環境変数設定（AWS credentials, GITHUB_TOKEN）
+
+### docker-compose.yml 案
+
+```yaml
+# docker-compose.yml
+services:
+  worker:
+    build: ./worker
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # DooD
+      - ./worker/configs:/etc/codingworker:ro
+    environment:
+      - OLLAMA_HOST=host.docker.internal:11434
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+```
+
+### 33-2: Taskfile 拡張
+- [ ] `task docker:build` - Worker イメージビルド
+- [ ] `task docker:run` - Worker コンテナ実行
+- [ ] `task docker:logs` - ログ確認
+
+---
+
+## タスク34: Ollama 連携
+
+### 34-1: ネットワーク設定
+- [ ] `host.docker.internal` での Ollama 接続確認
+- [ ] Aider の `--model` オプションで Ollama URL 指定
+
+### 34-2: 設定ファイル対応
+- [ ] `config.yaml` に `ollama.host` 設定追加
+- [ ] 環境変数 `OLLAMA_HOST` のサポート
+
+---
+
+## タスク35: テスト・検証
+
+### 35-1: ローカルテスト
+- [ ] OrbStack でのコンテナ起動確認
+- [ ] Ollama (ホスト) への接続確認
+- [ ] Docker Socket 経由での pj-x コンテナ起動確認
+
+### 35-2: E2E テスト
+- [ ] SQS → Worker (コンテナ) → pj-x ビルド → PR 作成
+
+---
+
+## タスク36: オプション（将来）
+
+- [ ] GitHub Container Registry (ghcr.io) へのイメージ公開
+- [ ] Healthcheck エンドポイント追加
+- [ ] ログの永続化（ボリュームマウント）
+
+---
+
+## Phase 7 完了判定基準
+
+- [ ] `docker compose up` で Worker が起動する
+- [ ] Worker コンテナから Ollama (ホスト) に接続できる
+- [ ] Worker コンテナから pj-x コンテナを起動できる (DooD)
+- [ ] 従来通り SQS → PR 作成のフローが動作する
 
 ---
 
 **最終更新**: 2025-01-26
-**バージョン**: 2.1（Taskfile採用、詳細設計追加）
-**総タスク数**: 23メインタスク
-**想定期間**: 10-15日
+**バージョン**: 2.5（Phase 5 コンテナ実行対応、Phase 7 Worker コンテナ化追加）
+**総タスク数**: 36タスク（Phase 0〜7）
+**想定期間**: Phase 0-4: 10-15日 / Phase 5: +4-5日 / Phase 6: +4日 / Phase 7: +2-3日
