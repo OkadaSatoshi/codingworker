@@ -1,0 +1,31 @@
+# CodingWorker Configuration
+# Copy this file to config.yaml and customize for your environment.
+#
+# Environment-specific settings:
+#   - M4 Mac: Use qwen2.5-coder:7b (faster, higher quality)
+#   - Intel Mac: Use qwen2.5-coder:1.5b (7B is too slow)
+
+sqs:
+  queue_url: ""  # Set when AWS is configured
+  region: "ap-northeast-1"
+  wait_time_seconds: 20
+  visibility_timeout: 3600
+  use_mock: true  # Set to false when using real AWS SQS
+
+aider:
+  bin_path: "${HOME}/.local/bin/aider"
+  map_tokens: 0
+  models:
+    # Change model based on your hardware:
+    #   M4 Mac:    ollama_chat/qwen2.5-coder:7b
+    #   Intel Mac: ollama_chat/qwen2.5-coder:1.5b
+    - name: "ollama_chat/qwen2.5-coder:1.5b"
+      timeout_seconds: 600  # 10 minutes
+
+github:
+  token: "${GITHUB_TOKEN}"
+  clone_base_dir: "/tmp/codingworker"
+
+worker:
+  max_retries: 3
+  worker_id: "mbp-001"  # Change to identify your machine

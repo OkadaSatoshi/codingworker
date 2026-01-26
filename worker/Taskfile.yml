@@ -84,6 +84,29 @@ tasks:
       - echo "Coverage report generated at coverage.html"
 
   # =============================================================================
+  # Setup
+  # =============================================================================
+  setup:
+    desc: 初期セットアップ（config作成 + 依存関係）
+    cmds:
+      - task: setup:config
+      - task: deps
+
+  setup:config:
+    desc: 設定ファイルを作成（config.yaml.sample → config.yaml）
+    cmds:
+      - |
+        if [ -f configs/config.yaml ]; then
+          echo "configs/config.yaml already exists. Skipping."
+        else
+          cp configs/config.yaml.sample configs/config.yaml
+          echo "Created configs/config.yaml from sample."
+          echo "Edit configs/config.yaml to customize settings (e.g., model name)."
+        fi
+    status:
+      - test -f configs/config.yaml
+
+  # =============================================================================
   # Dependencies
   # =============================================================================
   deps:

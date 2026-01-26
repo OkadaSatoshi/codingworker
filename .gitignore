@@ -8,6 +8,9 @@
 *.pem
 *.key
 
+# Worker config (copy from config.yaml.sample)
+worker/configs/config.yaml
+
 # Go build artifacts
 worker/bin/
 worker/worker
