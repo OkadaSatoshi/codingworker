@@ -1,0 +1,13 @@
+# Aider configuration for CodingWorker
+# See: https://aider.chat/docs/config/aider_conf.html
+
+# Disable auto-commits (worker handles git)
+auto-commits: false
+
+# Read conventions file for every task
+read:
+  - CONVENTIONS.md
+
+# Lint after changes
+auto-lint: true
+lint-cmd: go fmt ./...

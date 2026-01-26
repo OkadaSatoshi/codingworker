@@ -16,9 +16,11 @@ sqs:
   wait_time_seconds: 10
   visibility_timeout: 300
 aider:
-  model: "ollama_chat/qwen2.5-coder:7b"
   bin_path: "/usr/local/bin/aider"
-  timeout_seconds: 1800
+  map_tokens: 0
+  models:
+    - name: "ollama_chat/qwen2.5-coder:1.5b"
+      timeout_seconds: 600
 github:
   token: "test-token"
   clone_base_dir: "/tmp/workdir"
@@ -55,14 +57,20 @@ worker:
 	}
 
 	// Verify Aider config
-	if cfg.Aider.Model != "ollama_chat/qwen2.5-coder:7b" {
-		t.Errorf("unexpected model: %s", cfg.Aider.Model)
-	}
 	if cfg.Aider.BinPath != "/usr/local/bin/aider" {
 		t.Errorf("unexpected bin_path: %s", cfg.Aider.BinPath)
 	}
-	if cfg.Aider.Timeout != 1800 {
-		t.Errorf("expected timeout 1800, got %d", cfg.Aider.Timeout)
+	if cfg.Aider.MapTokens != 0 {
+		t.Errorf("expected map_tokens 0, got %d", cfg.Aider.MapTokens)
+	}
+	if len(cfg.Aider.Models) != 1 {
+		t.Errorf("expected 1 model, got %d", len(cfg.Aider.Models))
+	}
+	if cfg.Aider.Models[0].Name != "ollama_chat/qwen2.5-coder:1.5b" {
+		t.Errorf("unexpected model name: %s", cfg.Aider.Models[0].Name)
+	}
+	if cfg.Aider.Models[0].Timeout != 600 {
+		t.Errorf("expected timeout 600, got %d", cfg.Aider.Models[0].Timeout)
 	}
 
 	// Verify GitHub config
@@ -106,14 +114,17 @@ sqs:
 	if cfg.SQS.VisibilityTimeout != 3600 {
 		t.Errorf("expected default visibility_timeout 3600, got %d", cfg.SQS.VisibilityTimeout)
 	}
-	if cfg.Aider.Model != "ollama_chat/qwen2.5-coder:1.5b" {
-		t.Errorf("expected default model, got %s", cfg.Aider.Model)
+	if len(cfg.Aider.Models) != 1 {
+		t.Errorf("expected 1 default model, got %d", len(cfg.Aider.Models))
+	}
+	if cfg.Aider.Models[0].Name != "ollama_chat/qwen2.5-coder:1.5b" {
+		t.Errorf("expected default model 1.5b, got %s", cfg.Aider.Models[0].Name)
+	}
+	if cfg.Aider.Models[0].Timeout != 600 {
+		t.Errorf("expected default timeout 600, got %d", cfg.Aider.Models[0].Timeout)
 	}
 	if cfg.Aider.BinPath != "aider" {
 		t.Errorf("expected default bin_path 'aider', got %s", cfg.Aider.BinPath)
-	}
-	if cfg.Aider.Timeout != 3600 {
-		t.Errorf("expected default timeout 3600, got %d", cfg.Aider.Timeout)
 	}
 	if cfg.Worker.MaxRetries != 3 {
 		t.Errorf("expected default max_retries 3, got %d", cfg.Worker.MaxRetries)

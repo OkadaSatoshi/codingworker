@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -154,8 +155,8 @@ func (w *Worker) processNextMessage(ctx context.Context) error {
 		"title", msg.Title,
 	)
 
-	// Execute with retry policy
-	policy := retry.DefaultPolicy()
+	// Execute with retry policy (uses config max_retries, fixed 10s backoff)
+	policy := retry.NewPolicy(w.config.Worker.MaxRetries)
 	var prURL string
 
 	result := policy.Do(ctx, func() error {
@@ -225,9 +226,13 @@ func (w *Worker) processTask(ctx context.Context, msg *sqs.Message) (string, err
 	}
 	defer os.RemoveAll(workDir)
 
-	// 3. Run Aider to generate code
-	if err := w.aider.Run(ctx, workDir, msg.Title, msg.Body); err != nil {
-		// Aider failures are typically permanent (code generation issues)
+	// 3. Run Aider to generate code (2-pass: implementation + tests)
+	if err := w.aider.RunWithTests(ctx, workDir, msg.Title, msg.Body); err != nil {
+		// Timeout errors are transient (can retry with fresh clone)
+		if errors.Is(err, context.DeadlineExceeded) {
+			return "", &retry.TransientError{Err: fmt.Errorf("aider timed out: %w", err)}
+		}
+		// Other Aider failures (after internal fix attempts) are permanent
 		return "", &retry.PermanentError{Err: fmt.Errorf("aider failed: %w", err)}
 	}
 

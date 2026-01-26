@@ -65,13 +65,12 @@ func Load(path string) (*Config, error) {
 	}
 	if len(cfg.Aider.Models) == 0 {
 		cfg.Aider.Models = []ModelConfig{
-			{Name: "ollama_chat/qwen2.5-coder:3b", Timeout: 900},
-			{Name: "ollama_chat/qwen2.5-coder:1.5b", Timeout: 900},
+			{Name: "ollama_chat/qwen2.5-coder:1.5b", Timeout: 600},
 		}
 	}
 	for i := range cfg.Aider.Models {
 		if cfg.Aider.Models[i].Timeout == 0 {
-			cfg.Aider.Models[i].Timeout = 900 // 15分
+			cfg.Aider.Models[i].Timeout = 600 // 10分
 		}
 	}
 	if cfg.Aider.BinPath == "" {

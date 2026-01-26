@@ -7,9 +7,15 @@ import (
 	"log/slog"
 	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/OkadaSatoshi/codingworker/worker/internal/config"
+)
+
+const (
+	// maxFixAttempts is the maximum number of times to ask Aider to fix errors
+	maxFixAttempts = 3
 )
 
 // Runner executes Aider commands
@@ -49,6 +55,164 @@ func (r *Runner) Run(ctx context.Context, workDir, title, body string) error {
 		}
 	}
 	return fmt.Errorf("all models timed out: %w", lastErr)
+}
+
+// RunWithTests executes Aider in 2 passes: implementation + test creation
+// Each pass includes retry-with-fix logic for build/lint/test failures
+func (r *Runner) RunWithTests(ctx context.Context, workDir, title, body string) error {
+	// Pass 1: Implementation with build verification
+	slog.Info("Pass 1: Running implementation")
+	if err := r.runAndVerifyBuild(ctx, workDir, title, body); err != nil {
+		return fmt.Errorf("pass 1 (implementation) failed: %w", err)
+	}
+
+	// Pass 2: Test creation with full verification
+	slog.Info("Pass 2: Running test creation")
+	testPrompt := fmt.Sprintf("Add unit tests for the changes made for: %s", title)
+	if err := r.runAndVerifyAll(ctx, workDir, testPrompt); err != nil {
+		return fmt.Errorf("pass 2 (test creation) failed: %w", err)
+	}
+
+	return nil
+}
+
+// runAndVerifyBuild runs Aider and verifies build, retrying with fix prompts on failure
+func (r *Runner) runAndVerifyBuild(ctx context.Context, workDir, title, body string) error {
+	// Initial run
+	if err := r.Run(ctx, workDir, title, body); err != nil {
+		return err
+	}
+
+	// Verify build with retry-fix loop
+	for attempt := 1; attempt <= maxFixAttempts; attempt++ {
+		buildErr := r.verifyBuildWithOutput(ctx, workDir)
+		if buildErr == nil {
+			return nil // Success
+		}
+
+		if attempt == maxFixAttempts {
+			return fmt.Errorf("build failed after %d fix attempts: %w", maxFixAttempts, buildErr)
+		}
+
+		slog.Warn("Build failed, asking Aider to fix",
+			"attempt", attempt,
+			"max_attempts", maxFixAttempts,
+		)
+
+		// Ask Aider to fix the build error
+		fixPrompt := fmt.Sprintf("Fix the following build error:\n\n%s", buildErr.Error())
+		if err := r.Run(ctx, workDir, fixPrompt, ""); err != nil {
+			return fmt.Errorf("aider fix attempt failed: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// runAndVerifyAll runs Aider and verifies build+lint+test, retrying with fix prompts on failure
+func (r *Runner) runAndVerifyAll(ctx context.Context, workDir, prompt string) error {
+	// Initial run
+	if err := r.Run(ctx, workDir, prompt, ""); err != nil {
+		return err
+	}
+
+	// Verify with retry-fix loop
+	for attempt := 1; attempt <= maxFixAttempts; attempt++ {
+		// Check build
+		if buildErr := r.verifyBuildWithOutput(ctx, workDir); buildErr != nil {
+			if attempt == maxFixAttempts {
+				return fmt.Errorf("build failed after %d fix attempts: %w", maxFixAttempts, buildErr)
+			}
+			slog.Warn("Build failed, asking Aider to fix", "attempt", attempt)
+			fixPrompt := fmt.Sprintf("Fix the following build error:\n\n%s", buildErr.Error())
+			if err := r.Run(ctx, workDir, fixPrompt, ""); err != nil {
+				return fmt.Errorf("aider fix attempt failed: %w", err)
+			}
+			continue
+		}
+
+		// Check lint
+		if lintErr := r.verifyLintWithOutput(ctx, workDir); lintErr != nil {
+			if attempt == maxFixAttempts {
+				return fmt.Errorf("lint failed after %d fix attempts: %w", maxFixAttempts, lintErr)
+			}
+			slog.Warn("Lint failed, asking Aider to fix", "attempt", attempt)
+			fixPrompt := fmt.Sprintf("Fix the following lint error:\n\n%s", lintErr.Error())
+			if err := r.Run(ctx, workDir, fixPrompt, ""); err != nil {
+				return fmt.Errorf("aider fix attempt failed: %w", err)
+			}
+			continue
+		}
+
+		// Check tests
+		if testErr := r.verifyTestsWithOutput(ctx, workDir); testErr != nil {
+			if attempt == maxFixAttempts {
+				return fmt.Errorf("tests failed after %d fix attempts: %w", maxFixAttempts, testErr)
+			}
+			slog.Warn("Tests failed, asking Aider to fix", "attempt", attempt)
+			fixPrompt := fmt.Sprintf("Fix the following test failure:\n\n%s", testErr.Error())
+			if err := r.Run(ctx, workDir, fixPrompt, ""); err != nil {
+				return fmt.Errorf("aider fix attempt failed: %w", err)
+			}
+			continue
+		}
+
+		// All checks passed
+		slog.Info("All verifications passed", "attempts", attempt)
+		return nil
+	}
+
+	return nil
+}
+
+// verifyBuildWithOutput runs go build and returns error with output for fix prompts
+func (r *Runner) verifyBuildWithOutput(ctx context.Context, workDir string) error {
+	cmd := exec.CommandContext(ctx, "go", "build", "./...")
+	cmd.Dir = workDir
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		slog.Error("Build failed", "output", string(output))
+		// Include output in error for fix prompts
+		return fmt.Errorf("go build failed:\n%s", strings.TrimSpace(string(output)))
+	}
+	slog.Info("Build successful")
+	return nil
+}
+
+// verifyLintWithOutput runs go fmt and go vet, returns error with output for fix prompts
+func (r *Runner) verifyLintWithOutput(ctx context.Context, workDir string) error {
+	// go fmt (auto-fixes, so we just run it)
+	fmtCmd := exec.CommandContext(ctx, "go", "fmt", "./...")
+	fmtCmd.Dir = workDir
+	if output, err := fmtCmd.CombinedOutput(); err != nil {
+		slog.Error("go fmt failed", "output", string(output))
+		return fmt.Errorf("go fmt failed:\n%s", strings.TrimSpace(string(output)))
+	}
+
+	// go vet
+	vetCmd := exec.CommandContext(ctx, "go", "vet", "./...")
+	vetCmd.Dir = workDir
+	if output, err := vetCmd.CombinedOutput(); err != nil {
+		slog.Error("go vet failed", "output", string(output))
+		return fmt.Errorf("go vet failed:\n%s", strings.TrimSpace(string(output)))
+	}
+
+	slog.Info("Lint passed")
+	return nil
+}
+
+// verifyTestsWithOutput runs go test and returns error with output for fix prompts
+func (r *Runner) verifyTestsWithOutput(ctx context.Context, workDir string) error {
+	cmd := exec.CommandContext(ctx, "go", "test", "./...")
+	cmd.Dir = workDir
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		slog.Error("Tests failed", "output", string(output))
+		// Include output in error for fix prompts
+		return fmt.Errorf("go test failed:\n%s", strings.TrimSpace(string(output)))
+	}
+	slog.Info("Tests passed", "output", strings.TrimSpace(string(output)))
+	return nil
 }
 
 // runWithModel executes Aider with a specific model

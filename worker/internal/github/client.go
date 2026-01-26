@@ -142,14 +142,19 @@ func (c *Client) buildPRBody(msg *sqs.Message) string {
 **関連Issue**: #%d
 **生成モデル**: Ollama qwen2.5-coder:1.5b (via Aider)
 **生成日時**: %s
+**生成方式**: 2パス（実装 + テスト自動生成）
 
 ### タスク内容
 %s
 
+### 自動検証結果
+- [x] ビルド成功 (go build)
+- [x] Lint通過 (go fmt, go vet)
+- [x] テスト通過 (go test)
+
 ### 確認事項
-- [ ] コードが正しく動作するか
-- [ ] テストが通るか
-- [ ] コーディング規約に準拠しているか
+- [ ] コードが期待通りに動作するか
+- [ ] テストカバレッジが十分か
 `,
 		msg.IssueNumber,
 		time.Now().Format("2006-01-02 15:04:05"),

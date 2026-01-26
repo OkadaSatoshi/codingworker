@@ -16,14 +16,18 @@ type Policy struct {
 	Multiplier     float64
 }
 
-// DefaultPolicy returns the default exponential backoff policy
-// 30s -> 60s -> 120s (max 3 retries)
+// DefaultPolicy returns the default retry policy with fixed 10s backoff
 func DefaultPolicy() *Policy {
+	return NewPolicy(3)
+}
+
+// NewPolicy creates a retry policy with the specified max retries and fixed 10s backoff
+func NewPolicy(maxRetries int) *Policy {
 	return &Policy{
-		MaxRetries:     3,
-		InitialBackoff: 30 * time.Second,
-		MaxBackoff:     120 * time.Second,
-		Multiplier:     2.0,
+		MaxRetries:     maxRetries,
+		InitialBackoff: 10 * time.Second,
+		MaxBackoff:     10 * time.Second, // Fixed backoff (no exponential growth)
+		Multiplier:     1.0,              // No multiplier
 	}
 }
 

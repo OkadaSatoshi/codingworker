@@ -1,5 +1,6 @@
 .aider*
 !.aider.model.metadata.json
+!.aider.conf.yml
 
 # Sensitive files
 .env
