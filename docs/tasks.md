@@ -693,7 +693,7 @@ worker/
 
 ### 選択肢1: モデル変更
 - qwen2.5-coder:1.5b → codellama:7b
-- qwen2.5-coder:1.5b → qwen2.5-coder:3b（軽量版）
+- ~~qwen2.5-coder:3b~~ → 検証の結果、3BはDiff生成エラーやパス管理問題が発生し不採用
 
 ### 選択肢2: ツール変更
 - Aider → Open Interpreter

@@ -9,10 +9,8 @@ aider:
   bin_path: "${HOME}/.local/bin/aider"
   map_tokens: 0
   models:
-    - name: "ollama_chat/qwen2.5-coder:3b"
-      timeout_seconds: 900  # 15分
     - name: "ollama_chat/qwen2.5-coder:1.5b"
-      timeout_seconds: 900  # 15分
+      timeout_seconds: 600  # 10分
 
 github:
   token: "${GITHUB_TOKEN}"
