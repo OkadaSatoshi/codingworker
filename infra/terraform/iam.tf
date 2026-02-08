@@ -90,7 +90,3 @@ resource "aws_iam_user_policy" "worker_sqs" {
   policy = data.aws_iam_policy_document.worker_sqs.json
 }
 
-# Access key for worker (store securely!)
-resource "aws_iam_access_key" "worker" {
-  user = aws_iam_user.worker.name
-}
