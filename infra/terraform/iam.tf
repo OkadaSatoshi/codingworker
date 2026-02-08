@@ -80,10 +80,7 @@ data "aws_iam_policy_document" "worker_sqs" {
       "sqs:GetQueueAttributes",
       "sqs:ChangeMessageVisibility"
     ]
-    resources = [
-      aws_sqs_queue.tasks.arn,
-      aws_sqs_queue.tasks_dlq.arn
-    ]
+    resources = [aws_sqs_queue.tasks.arn]
   }
 }
 
