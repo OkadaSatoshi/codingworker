@@ -26,17 +26,6 @@ output "github_actions_role_arn" {
   value       = aws_iam_role.github_actions.arn
 }
 
-output "worker_access_key_id" {
-  description = "Access key ID for the worker"
-  value       = aws_iam_access_key.worker.id
-}
-
-output "worker_secret_access_key" {
-  description = "Secret access key for the worker (sensitive)"
-  value       = aws_iam_access_key.worker.secret
-  sensitive   = true
-}
-
 # =============================================================================
 # OIDC Outputs
 # =============================================================================
