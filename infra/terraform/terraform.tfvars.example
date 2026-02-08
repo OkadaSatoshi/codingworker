@@ -1,8 +1,8 @@
 # Copy this file to terraform.tfvars and fill in the values
 
 # Required
-github_org  = "your-github-username-or-org"
-github_repo = "codingworker-sandbox"
+github_org   = "your-github-username-or-org"
+github_repos = ["repo-a", "repo-b"]
 
 # Optional (defaults shown)
 # aws_region             = "ap-northeast-1"

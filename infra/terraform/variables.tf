@@ -15,10 +15,9 @@ variable "github_org" {
   type        = string
 }
 
-variable "github_repo" {
-  description = "GitHub repository name for the test project"
-  type        = string
-  default     = "codingworker-sandbox"
+variable "github_repos" {
+  description = "GitHub repository names that can trigger workflows"
+  type        = list(string)
 }
 
 variable "sqs_visibility_timeout" {
