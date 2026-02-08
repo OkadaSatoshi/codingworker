@@ -7,6 +7,6 @@ github_repos = ["repo-a", "repo-b"]
 # Optional (defaults shown)
 # aws_region             = "ap-northeast-1"
 # environment            = "dev"
-# sqs_visibility_timeout = 3600
-# sqs_message_retention  = 86400
-# dlq_max_receive_count  = 3
+# sqs_visibility_timeout = 10800
+# sqs_message_retention  = 604800
+# sqs_max_receive_count  = 3
