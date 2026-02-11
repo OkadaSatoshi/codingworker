@@ -1,144 +1,142 @@
 # AWS アカウント初期セットアップガイド
 
-AWSルートアカウント作成後に行うべき設定手順。
+AWS Organizations + IAM Identity Center (SSO) によるマルチアカウント構成のセットアップ手順。
+
+> **詳細な手順・Q&A**: [Issue #1: AWS環境準備](https://github.com/OkadaSatoshi/codingworker/issues/1) を参照
 
 ---
 
-## 1. ルートアカウントのセキュリティ強化（最優先）
-
-ルートアカウントは日常的に使用せず、以下を設定後は IAM ユーザーを使用する。
-
-### 1.1 MFA（多要素認証）の有効化
-
-1. AWS Console にルートアカウントでログイン
-2. 右上のアカウント名 → Security credentials
-3. MFA デバイスを割り当て（Google Authenticator 等のアプリ推奨）
-
-### 1.2 ルートアカウントのアクセスキー
-
-**ルートアカウントのアクセスキーは絶対に作成しない。**
-
----
-
-## 2. 管理者用 IAM ユーザーの作成
-
-Terraform 実行や日常の AWS 操作に使用する。
-
-### 2.1 Console で手動作成
-
-1. IAM → Users → Create user
-2. ユーザー名: `admin`（任意）
-3. 「Provide user access to the AWS Management Console」にチェック
-4. Permissions: `AdministratorAccess` ポリシーをアタッチ
-5. ユーザー作成完了
-
-### 2.2 MFA の有効化
-
-1. 作成したユーザーの Security credentials タブ
-2. MFA device → Assign MFA device
-
-### 2.3 アクセスキーの作成（CLI 用）
-
-1. Security credentials → Access keys → Create access key
-2. Use case: Command Line Interface (CLI)
-3. アクセスキー ID とシークレットアクセスキーを安全に保存
-
----
-
-## 3. 請求アラートの設定
-
-予期しない課金を防ぐ。
-
-1. Billing → Budgets → Create budget
-2. Budget type: Cost budget
-3. 月額予算: $5〜$10（任意）
-4. Alert threshold: 80% で通知
-5. 通知先メールアドレスを設定
-
----
-
-## 4. AWS CLI の設定
-
-```bash
-# インストール（未インストールの場合）
-brew install awscli
-
-# 認証情報の設定
-aws configure
-# Access Key ID: （管理者 IAM ユーザーのもの）
-# Secret Access Key: （管理者 IAM ユーザーのもの）
-# Region: ap-northeast-1（東京）
-# Output format: json
-
-# 確認
-aws sts get-caller-identity
-```
-
----
-
-## 5. IAM ユーザーの設計指針
-
-### 人間用 vs サービス用
-
-| 種類 | 数 | 用途 |
-|------|---|------|
-| 管理者（人間用） | 1 | Terraform 実行、Console 操作 |
-| サービス用 | PJ ごと | アプリケーションが使用 |
-
-### 命名規則
+## 1. 構成概要
 
 ```
-{プロジェクト名}-{用途}
-
-例:
-- codingworker-github-actions（GitHub Actions 用ロール）
-- codingworker-worker（ローカル Worker 用ユーザー）
+Management Account (個人アカウント)
+└── codingworker-dev  ← 開発環境
 ```
 
-### セキュリティ原則
-
-- 最小権限: 必要な権限のみ付与
-- PJ 分離: プロジェクトごとに IAM を分ける（1 つ漏洩しても他に影響なし）
+| 項目 | 方式 |
+|:---|:---|
+| アカウント管理 | AWS Organizations (All features) |
+| 認証方式 | IAM Identity Center (SSO) |
+| CLI 認証 | `aws configure sso` → SSO プロファイル |
+| 日常操作 | SSO ユーザー (AdministratorAccess Permission Set) |
 
 ---
 
-## 6. Terraform 実行準備
+## 2. セットアップ手順概要
 
-### 6.1 State 管理
+### 2.1 Organizations の有効化 (Management Account)
 
-開発初期はローカル State で十分。S3 + DynamoDB は後から移行可能。
+1. AWS Console → AWS Organizations → Create an organization
+2. 機能: All features
 
-### 6.2 初回実行
+### 2.2 メンバーアカウントの作成
 
-```bash
+1. Organizations → Add an AWS account → Create
+2. Account name: `codingworker-dev`
+3. IAM role name: `OrganizationAccountAccessRole`（デフォルト）
+4. Tags: `Environment=dev`, `Project=codingworker`
+
+### 2.3 IAM Identity Center の設定 (Management Account)
+
+1. IAM Identity Center を有効化（リージョン: ap-northeast-1）
+2. ユーザー作成 + MFA 設定
+3. Permission Set 作成: `AdministratorAccess`
+4. `codingworker-dev` アカウントにユーザーを割り当て
+
+### 2.4 メンバーアカウントのセキュリティ
+
+1. ルートユーザーのパスワードリセット + MFA 有効化（認証アプリ推奨）
+2. admin IAM ユーザー作成 + MFA 有効化（緊急用）
+
+### 2.5 AWS CLI の SSO 設定
+
+```zsh
+aws configure sso
+# SSO session name: codingworker
+# SSO start URL: https://d-xxxxxxxxxx.awsapps.com/start
+# SSO region: ap-northeast-1
+# → プロファイル名: codingworker-dev
+```
+
+### 2.6 動作確認
+
+```zsh
+aws sso login --profile codingworker-dev
+aws sts get-caller-identity --profile codingworker-dev
+```
+
+### 2.7 請求アラート設定 (Management Account)
+
+- Billing → Budgets で無料枠監視アラートを設定
+
+---
+
+## 3. Terraform 実行準備
+
+### 3.1 Terraform インストール
+
+```zsh
+brew tap hashicorp/tap
+brew install hashicorp/tap/terraform
+```
+
+※ Homebrew 標準の `terraform` は 1.5.7 で更新停止。hashicorp/tap から最新版をインストール。
+
+### 3.2 State 管理
+
+S3 backend + DynamoDB lock を使用。
+
+| リソース | 名前 | 作成方法 |
+|:---|:---|:---|
+| S3 バケット | `codingworker-dev-tfstate` | CLI 手動作成 |
+| DynamoDB テーブル | `codingworker-dev-tfstate-lock` | CLI 手動作成 |
+
+作成手順は [Issue #23](https://github.com/OkadaSatoshi/codingworker/issues/23) を参照。
+
+### 3.3 初回実行
+
+```zsh
 cd infra/terraform
 
 # 変数ファイル作成
 cp terraform.tfvars.example terraform.tfvars
-# terraform.tfvars を編集（github_org 等）
+# terraform.tfvars を編集（github_org, github_repos）
 
 # 初期化
 terraform init
 
-# 確認
+# 確認・適用
 terraform plan
-
-# 適用
 terraform apply
 ```
 
 ---
 
-## 7. 作業チェックリスト
+## 4. Worker 用 Access Key
 
-- [ ] ルートアカウント MFA 有効化
-- [ ] 管理者 IAM ユーザー作成
-- [ ] 管理者 IAM ユーザー MFA 有効化
-- [ ] 管理者でログインし直す（ルートは使わない）
-- [ ] 請求アラート設定
-- [ ] AWS CLI 設定・動作確認
-- [ ] Terraform init/plan 実行
+Worker (MBP) は 24h 稼働のため、SSO セッション（有効期限あり）ではなく IAM User の Access Key を使用する。
+
+```zsh
+aws iam create-access-key --user-name codingworker-worker --profile codingworker-dev
+```
+
+Access Key は Terraform 管理外（tfstate にシークレットを残さないため）。
+
+---
+
+## 5. 作業チェックリスト
+
+- [x] Organizations 有効化
+- [x] codingworker-dev アカウント作成
+- [x] IAM Identity Center 設定
+- [x] SSO ユーザー作成 + MFA
+- [x] ルートユーザー MFA 有効化
+- [x] AWS CLI SSO 設定・動作確認
+- [x] 請求アラート設定
+- [x] Terraform init/plan/apply 実行
+- [ ] Worker 用 Access Key 作成
 
 ---
 
 **作成日**: 2025-01-26
+**更新日**: 2025-02-08 - Organizations/SSO方式に全面改訂

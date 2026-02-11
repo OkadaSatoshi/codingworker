@@ -63,16 +63,21 @@
 
 | 設定項目 | 値 | 説明 |
 |:---|:---|:---|
-| visibility_timeout | 3600秒 (1時間) | Aider処理時間を考慮 |
-| message_retention | 86400秒 (1日) | 未処理メッセージの保持期間 |
+| visibility_timeout | 10800秒 (3時間) | 低スペックマシンでのAider処理時間を考慮 |
+| message_retention | 604800秒 (7日) | 未処理メッセージの保持期間 |
 | receive_wait_time | 20秒 | ロングポーリング |
 | redrive_policy | maxReceiveCount: 3 | 3回失敗でDLQへ移動 |
+| sqs_managed_sse_enabled | true | サーバーサイド暗号化 (SSE-SQS) |
+| Queue Policy | DenyNonSSLAccess | HTTPS以外のアクセスを拒否 |
 
 #### デッドレターキュー: `codingworker-tasks-dlq`
 
 | 設定項目 | 値 | 説明 |
 |:---|:---|:---|
-| message_retention | 604800秒 (7日) | 調査用に長めに保持 |
+| message_retention | 1209600秒 (14日) | SQS最大値。調査用に長めに保持 |
+| sqs_managed_sse_enabled | true | サーバーサイド暗号化 (SSE-SQS) |
+| redrive_allow_policy | byQueue | メインキューのみリドライブ元として許可 |
+| Queue Policy | DenyNonSSLAccess | HTTPS以外のアクセスを拒否 |
 
 ### 3.2 IAM OIDC Provider
 
@@ -99,8 +104,8 @@ GitHub Actionsが使用するロール。
     "StringEquals": {
       "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
     },
-    "StringLike": {
-      "token.actions.githubusercontent.com:sub": "repo:{org}/{repo}:*"
+    "StringEquals": {
+      "token.actions.githubusercontent.com:sub": "repo:{org}/{repo}:ref:refs/heads/main"
     }
   }
 }
@@ -186,7 +191,7 @@ MBP上のWorkerが使用するユーザー。
 
 ```
 infra/terraform/
-├── backend.tf      # State管理 (ローカル)
+├── backend.tf      # State管理 (S3)
 ├── provider.tf     # AWSプロバイダー
 ├── variables.tf    # 入力変数
 ├── outputs.tf      # 出力値
@@ -200,11 +205,12 @@ infra/terraform/
 | 変数名 | デフォルト値 | 説明 |
 |:---|:---|:---|
 | aws_region | ap-northeast-1 | AWSリージョン |
+| environment | dev | 環境名 |
 | github_org | - | GitHubオーナー名 (必須) |
-| github_repo | codingworker-sandbox | 対象リポジトリ名 |
-| sqs_visibility_timeout | 3600 | 可視性タイムアウト (秒) |
-| sqs_message_retention | 86400 | メッセージ保持期間 (秒) |
-| dlq_max_receive_count | 3 | DLQ移動までの最大受信回数 |
+| github_repos | - | 対象リポジトリ名リスト (必須) |
+| sqs_visibility_timeout | 10800 | 可視性タイムアウト (秒) |
+| sqs_message_retention | 604800 | メッセージ保持期間 (秒) |
+| sqs_max_receive_count | 3 | DLQ移動までの最大受信回数 |
 
 ### 6.3 出力値
 
@@ -212,8 +218,9 @@ infra/terraform/
 |:---|:---|
 | sqs_queue_url | SQSキューURL |
 | sqs_queue_arn | SQSキューARN |
+| sqs_dlq_url | DLQキューURL |
 | github_actions_role_arn | GitHub Actions用ロールARN |
-| worker_access_key_id | Worker用アクセスキーID |
+| oidc_provider_arn | GitHub OIDC ProviderのARN |
 
 ### 6.4 適用手順
 
@@ -247,11 +254,26 @@ terraform apply
 
 ### 7.2 認証情報の管理
 
-| 認証情報 | 保存場所 |
+| 認証情報 | 保存場所 | 備考 |
+|:---|:---|:---|
+| AWS_ROLE_ARN | GitHub Secrets | GitHub Actions OIDC認証用 |
+| Worker Access Key | ~/.aws/credentials | CLI手動作成（Terraform管理外） |
+| GITHUB_TOKEN | ローカル環境変数 | Worker の GitHub 操作用 |
+
+---
+
+### 7.3 Terraform Backend
+
+| 項目 | 値 |
 |:---|:---|
-| AWS_ROLE_ARN | GitHub Secrets |
-| Worker Access Key | ローカル環境変数 or ~/.aws/credentials |
-| GITHUB_TOKEN | ローカル環境変数 |
+| Backend | S3 |
+| Bucket | `codingworker-dev-tfstate` |
+| Key | `codingworker/terraform.tfstate` |
+| DynamoDB Lock Table | `codingworker-dev-tfstate-lock` |
+| 暗号化 | AES256 (SSE-S3) |
+| バケットポリシー | DenyNonSSLAccess |
+
+S3バケット・DynamoDBテーブルはTerraform管理外（CLI手動作成）。
 
 ---
 
@@ -260,3 +282,4 @@ terraform apply
 | 日付 | 内容 |
 |:---|:---|
 | 2025-01-26 | 初版作成 |
+| 2025-02-08 | SQS設定値更新、暗号化・Queue Policy追加、OIDC条件修正、S3 backend移行、Access Key管理方針変更 |

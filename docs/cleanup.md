@@ -4,7 +4,7 @@
 
 ## 1. Ollamaの削除
 
-```bash
+```zsh
 # サービス停止
 brew services stop ollama
 
@@ -20,9 +20,9 @@ rm -rf ~/.ollama
 
 ## 2. Aiderの削除
 
-```bash
+```zsh
 # Aiderアンインストール
-pip3 uninstall aider-chat -y
+uv tool uninstall aider-chat
 
 # キャッシュの削除（オプション）
 rm -rf ~/.aider
@@ -30,7 +30,7 @@ rm -rf ~/.aider
 
 ## 3. 削除確認
 
-```bash
+```zsh
 # コマンドが見つからなければOK
 which ollama
 which aider
@@ -44,12 +44,12 @@ ls ~/.aider
 
 ### Homebrewキャッシュのクリア
 
-```bash
+```zsh
 brew cleanup
 ```
 
-### pipキャッシュのクリア
+### uvキャッシュのクリア
 
-```bash
-pip3 cache purge
+```zsh
+uv cache clean
 ```

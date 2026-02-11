@@ -51,7 +51,7 @@ GitHub Issues に起票されたコーディングタスクを、MBP上のロー
 | GitHub Actions | タスク送信トリガー | GitHub |
 | AWS SQS | メッセージキュー | AWS（無料枠） |
 | Go Worker | タスク取得・実行制御 | MBP 2018 |
-| OpenHands | コーディングエージェント | MBP 2018（Docker） |
+| Aider | コーディングエージェント（CLI） | MBP 2018 |
 | Ollama | ローカルLLM推論 | MBP 2018 |
 
 ### 4.3 データフロー
@@ -63,9 +63,9 @@ GitHub Issues に起票されたコーディングタスクを、MBP上のロー
    ↓
 3. MBP上の Go Worker が SQS をロングポーリング
    ↓
-4. Worker が Docker API 経由で OpenHands コンテナ起動
+4. Worker が Aider CLI を呼び出し
    ↓
-5. OpenHands がローカル Ollama (qwen2.5-coder:1.5b) を呼び出し
+5. Aider がローカル Ollama (qwen2.5-coder:1.5b) を使用してコード生成
    ↓
 6. コード生成後、GitHub へ Push し PR作成
 ```
@@ -165,8 +165,7 @@ GitHub Issues に起票されたコーディングタスクを、MBP上のロー
 - [ ] Go Worker のソースコード
 - [ ] Terraform 設定ファイル（IaC）
 - [ ] GitHub Actions ワークフロー定義
-- [ ] OpenHands 設定ファイル
-- [ ] Docker Compose 設定
+- [ ] Aider 設定ファイル
 
 ### 7.3 ドキュメント
 
@@ -180,30 +179,18 @@ GitHub Issues に起票されたコーディングタスクを、MBP上のロー
 
 ## 8. リポジトリ構成
 
-### 8.1 Three-Layer IaC 方針
+### 8.1 モノレポ構成
 
-| リポジトリ名 | 役割 | 管理対象 |
-|:---|:---|:---|
-| **codingworker-infra** | クラウド共通基盤 | IAM OIDC Provider, 共通IAM Role, Terraform State管理 |
-| **codingworker-host** | MBP実行環境 | Docker Compose, Go Worker, OpenHands設定 |
-| **project-x** | 個別プロジェクト | アプリコード, 専用SQS, GitHub Actions ワークフロー |
+AI コーディングとの親和性を考慮し、単一リポジトリで管理する。
 
-### 8.2 各リポジトリの詳細
-
-#### codingworker-infra
-- 初期化: 最初に1回のみ
-- 更新頻度: 低（ほぼ変更なし）
-- 依存関係: なし
-
-#### codingworker-host
-- 初期化: MBPセットアップ時
-- 更新頻度: 低〜中（ワーカーのアップデート時）
-- 依存関係: codingworker-infra
-
-#### project-x
-- 初期化: プロジェクトごと
-- 更新頻度: 高（開発中は頻繁）
-- 依存関係: codingworker-infra, codingworker-host
+```
+codingworker/
+├── docs/           # ドキュメント
+├── poc/            # PoC テストケース
+├── scripts/        # 自動化スクリプト
+├── worker/         # Go Worker
+└── infra/terraform # Terraform (IaC)
+```
 
 ---
 
